@@ -1,0 +1,54 @@
+# =====================================================================
+# Filter list — what must NEVER reach this public repo (defense in depth).
+# The git repo lives in this subfolder; private workspace files (CLAUDE.md,
+# TODO.md, .claude/, .mcp.json) sit one level up, physically outside the tree.
+# =====================================================================
+
+# --- Secrets / credentials ---
+*.env
+.env
+.env.*
+.envrc
+*.secret
+*secret*
+secrets/
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+*.token
+*_token
+.netrc
+.npmrc
+.pypirc
+auth.json
+.copr
+
+# --- Claude harness / local tooling (belt-and-suspenders; already outside repo) ---
+.claude/
+.mcp.json
+CLAUDE.md
+TODO.md
+
+# --- Editor / OS / sandbox-masked dotfiles ---
+.idea/
+.vscode/
+.DS_Store
+.bash_profile
+.bashrc
+.gitconfig
+.gitmodules
+.profile
+.ripgreprc
+.zprofile
+.zshrc
+
+# --- Local build artifacts (upstream sources are fetched by Packit/spectool) ---
+*.rpm
+*.src.rpm
+/results/
+*.log
+__pycache__/
+*.pyc
