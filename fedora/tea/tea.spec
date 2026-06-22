@@ -5,7 +5,7 @@
 
 Name:           tea
 Version:        0.14.1
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Command-line tool to interact with Gitea and Forgejo
 
 License:        MIT
@@ -36,14 +36,26 @@ cp -p %{SOURCE1} LICENSE
 %build
 # Repackaging only — decompress the prebuilt binary.
 xz -dc %{SOURCE0} > %{name}
+chmod +x %{name}
+
+# Man page: tea generates its own via the hidden `tea man` subcommand (urfave/
+# cli-docs, upstream cmd/man.go). Render it straight from the binary we ship — it
+# introspects its own command tree, needs no network/config, and is always in
+# sync with this exact version. No converter, no vendored doc, no watcher work.
+./%{name} man > %{name}.1
 
 %install
 install -D -p -m0755 %{name} %{buildroot}%{_bindir}/%{name}
+install -D -p -m0644 %{name}.1 %{buildroot}%{_mandir}/man1/%{name}.1
 
 %files
 %license LICENSE
 %{_bindir}/%{name}
+%{_mandir}/man1/%{name}.1*
 
 %changelog
+* Mon Jun 22 2026 gmipf <gmipf64@gmail.com> - 0.14.1-2
+- Ship a man page, generated at build time from the binary's `tea man` output
+
 * Mon Jun 22 2026 gmipf <gmipf64@gmail.com> - 0.14.1-1
 - Initial package: repackage upstream static linux-amd64 binary
