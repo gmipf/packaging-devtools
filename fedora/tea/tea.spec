@@ -17,7 +17,9 @@ URL:            https://gitea.com/gitea/tea
 #   %%{url}/releases/download/v%%{version}/%%{name}-%%{version}-linux-amd64.xz
 Source0:        %{name}-%{version}-linux-amd64.xz
 # LICENSE shipped locally too (flat): the release ships no LICENSE asset and
-# gitea.com /raw/ + /archive/ return an HTML challenge. Watcher refreshes via API.
+# gitea.com /raw/ + /archive/ return an HTML challenge, so it was fetched once via
+# the contents API. It's MIT and stable — the watcher leaves it untouched; refresh
+# it by hand if upstream ever relicenses.
 Source1:        LICENSE
 
 # We repackage upstream's amd64 binary -> x86_64 only.
