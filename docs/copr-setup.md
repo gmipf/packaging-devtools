@@ -55,6 +55,25 @@ Settings rationale:
 name `devtools`, tick the Fedora chroots, set Description/Instructions, leave "Enable
 internet during build" **off**, tick "Follow Fedora branching".
 
+### Rich Description / Instructions (Markdown)
+
+The Copr project page renders both fields as **Markdown** (headers, fenced ```` ```sh ````
+code blocks, links). `copr-cli create`/`modify` only take flat one-line strings, which is
+awkward for multi-line Markdown — so set them via the Python API instead (reads
+`~/.config/copr`, no shell-quoting of backticks/newlines):
+
+```python
+from copr.v3 import Client
+Client.create_from_config_file().project_proxy.edit(
+    ownername="gmipf", projectname="devtools",
+    description="…one paragraph…",
+    instructions="## Install\n\n```sh\nsudo dnf copr enable gmipf/devtools\n…\n```\n…",
+)
+```
+
+Mirror the layout of the sibling project `gmipf/media-preservation` (Install → Tools →
+Updates → Upstream → Packaging recipes, with a hobby/unsupported disclaimer).
+
 ---
 
 ## 3. Let Packit build here (two grants, BOTH critical)
