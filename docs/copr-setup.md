@@ -44,7 +44,7 @@ Settings rationale:
 | Flag | Value | Why |
 |------|-------|-----|
 | `--chroot` | `fedora-43/44-x86_64`, `fedora-rawhide-x86_64` | Mirrors the sibling project `gmipf/media-preservation` (active Fedora releases + rawhide). Add arches/releases as needed (see §6). |
-| `--enable-net` | `off` | Builds get **no** network. We **vendor** all deps (Go `vendor/`, etc.); Copr's `enable_net` only opens Fedora mirrors anyway, not language registries — so it can't fetch deps and only hurts reproducibility. |
+| `--enable-net` | `off` | Builds get **no** network — and neither does Copr's **source** build (where Packit runs `create-archive`). So we **vendor everything** flat in each tool's dir: dependency trees *and* prebuilt upstream binaries/`Source0` (committed, like `LICENSE`). Nothing is fetched at build time; the release watcher refreshes vendored sources where the network is reliable. `enable_net` only opens Fedora mirrors anyway, not arbitrary hosts — so turning it on wouldn't reliably fetch external sources and only hurts reproducibility. |
 | `--appstream` | `off` | Skip AppStream metadata generation — faster builds; CLI tools don't ship it. |
 | `--follow-fedora-branching` | `on` | When rawhide branches into a new Fedora release, the chroot is added automatically. |
 
@@ -52,16 +52,19 @@ Settings rationale:
 > (or the copr MCP `copr_list_mock_chroots`). aarch64 can be added later per tool.
 
 **Web UI equivalent:** <https://copr.fedorainfracloud.org/coprs/gmipf/> → **New Project** →
-name `tools`, tick the Fedora chroots, set Description/Instructions, leave "Enable
+name `devtools`, tick the Fedora chroots, set Description/Instructions, leave "Enable
 internet during build" **off**, tick "Follow Fedora branching".
 
 ---
 
-## 3. Grant Packit permission to build (critical)
+## 3. Let Packit build here (two grants, BOTH critical)
 
-Auto-builds come from the Packit service, which builds under its own Copr account.
-To let it build into **your** `gmipf/devtools` project, grant the `packit` user the
-**builder** role — otherwise Packit-triggered builds fail with a permission error:
+Auto-builds come from the Packit service. Two **independent** Copr-side grants are
+required — miss either and Packit-triggered builds end as `neutral`/failed before any
+RPM is produced. Both are independent of the GitHub token used to push the repo.
+
+**3a — builder permission.** Packit builds under its own Copr account (`packit`);
+grant it the **builder** role on your project:
 
 ```sh
 copr-cli edit-permissions --builder packit gmipf/devtools
@@ -69,8 +72,24 @@ copr-cli edit-permissions --builder packit gmipf/devtools
 
 (Web UI: project → **Permissions** → add user `packit` → Builder: *Approved*.)
 
-This is independent of the GitHub token you set up for pushing the repo — it's the
-Copr-side grant for the Packit build service.
+**3b — allow the git-forge project (easy to miss).** Copr also gatekeeps *which*
+git-forge repo may drive builds here. Without this, builds fail immediately with
+*"Your git-forge project is not allowed to use the configured `gmipf/devtools` Copr
+project"* — even though 3a is granted:
+
+```sh
+copr-cli modify gmipf/devtools --packit-forge-project-allowed github.com/gmipf/packaging-devtools
+```
+
+Wildcards work (e.g. `github.com/gmipf/*`). Verify:
+
+```sh
+curl -sg "https://copr.fedorainfracloud.org/api_3/project?ownername=gmipf&projectname=devtools" \
+  | python3 -c "import sys,json;print(json.load(sys.stdin).get('packit_forge_projects_allowed'))"
+# -> ['github.com/gmipf/packaging-devtools']
+```
+
+(Web UI: project → **Settings → Packit** → *Packit allowed forge projects*.)
 
 ---
 
@@ -92,7 +111,7 @@ Project page (canonical, user-scoped URLs — `gmipf/devtools/...`, not the gene
 
 ## 5. How it connects (after the project exists)
 
-- **`.packit.yaml`** points each `copr_build` job at `owner: gmipf`, `project: tools`
+- **`.packit.yaml`** points each `copr_build` job at `owner: gmipf`, `project: devtools`
   (or a per-tool override → a thematic Copr). On an upstream release, Packit builds
   the changed package straight into this project.
 - **`scripts/build-tool.sh <tool>`** fires a single manual build safely (NEVRA

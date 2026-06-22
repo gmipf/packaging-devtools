@@ -51,6 +51,12 @@ set -euo pipefail
 
 API=https://copr.fedorainfracloud.org/api_3
 
+# Vendored upstream binaries (Source0 committed flat) make pushes several MB. git's
+# default http.postBuffer (~1MB) then switches to chunked transfer, which must rewind
+# the body on a redirect and fails ("cannot rewind RPC post data"). Buffer the whole
+# pack instead. Passed per-command (-c) so we never touch a sandbox-RO .git/config.
+GIT="git -c http.postBuffer=524288000 -c http.version=HTTP/1.1"
+
 ROOT=$(git rev-parse --show-toplevel)
 cd "$ROOT"
 
@@ -130,7 +136,7 @@ case "$ACTION" in
 esac
 
 # --- canonical push (main builds nothing) ------------------------------------
-git push origin "HEAD:main"
+$GIT push origin "HEAD:main"
 
 # --- trigger branch = main's tree + a generic landing README (cosmetic), -----
 #     force-pushed so ONLY this tool's COPR job fires.
@@ -140,7 +146,7 @@ printf '# %s — %s (Fedora/COPR trigger branch)\n\nAuto-managed **trigger branc
   "$BR" "$PKG" "$PKG" "$PKG" "$SPECDIR" > README.md
 git add README.md
 git commit -q -m "trigger: $PKG build ($SPEC_V-$SPEC_RBASE)"
-git push -f origin "trigger-build:$BR"
+$GIT push -f origin "trigger-build:$BR"
 
 git checkout -q "$START_BRANCH"
 git branch -D trigger-build >/dev/null 2>&1 || true
