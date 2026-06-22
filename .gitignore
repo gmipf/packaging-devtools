@@ -52,3 +52,13 @@ TODO.md
 *.log
 __pycache__/
 *.pyc
+# Fetched upstream sources (Source0 etc.) — never committed; LICENSE (flat, no
+# extension) is the only source kept in-tree.
+*.xz
+*.gz
+*.bz2
+*.zst
+*.tar
+*.tar.*
+*.tgz
+*.zip

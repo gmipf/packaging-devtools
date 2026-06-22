@@ -1,0 +1,40 @@
+issue_repository: https://github.com/gmipf/packaging-devtools
+
+srpm_build_deps:
+  - rpm-build
+  - rpmdevtools
+
+# Multi-package layout — one block per tool under packages:. With paths: set,
+# specfile_path and action-internal paths are relative to that path. This repo
+# holds only packaging recipes, so create-archive fetches Source0 via spectool
+# (a default `git archive HEAD` would only archive the spec).
+packages:
+  tea:
+    paths:
+      - fedora/tea/
+    specfile_path: tea.spec
+    upstream_project_url: https://gitea.com/gitea/tea
+    # Repackage of the upstream prebuilt static linux-amd64 binary. spectool -g
+    # fetches the remote Source0 (.xz); the local LICENSE (Source1) is already
+    # flat in fedora/tea/. We return the binary as the primary archive anchor.
+    actions:
+      get-current-version:
+        - bash -c "rpmspec -q --queryformat '%{version}\n' tea.spec | head -1"
+      create-archive:
+        - bash -c "spectool -g tea.spec 1>&2"
+        - bash -c "ls -1 tea-*-linux-amd64.xz | head -1"
+
+jobs:
+  # Branch-scoped commit job: only a push to build-tea fires this build (a push
+  # to main builds nothing). scripts/build-tool.sh manages the trigger branch +
+  # the same-NEVRA auto-bump guard; do NOT hand-push build-tea. update_release
+  # stays false so the published NEVRA is exactly the spec's (clean bare-N).
+  - job: copr_build
+    trigger: commit
+    branch: build-tea
+    packages: [tea]
+    update_release: false
+    owner: gmipf
+    project: devtools
+    targets:
+      - fedora-all-x86_64
