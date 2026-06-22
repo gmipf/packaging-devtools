@@ -45,20 +45,13 @@ TODO.md
 .zprofile
 .zshrc
 
-# --- Local build artifacts (upstream sources are fetched by Packit/spectool) ---
+# --- Local build artifacts (NOT upstream sources) ---
+# Upstream sources are VENDORED (committed flat in fedora/<app>/) so COPR builds
+# stay hermetic/offline — nothing is fetched at build time. So we do NOT ignore
+# archives here; we only ignore generated build outputs.
 *.rpm
 *.src.rpm
 /results/
 *.log
 __pycache__/
 *.pyc
-# Fetched upstream sources (Source0 etc.) — never committed; LICENSE (flat, no
-# extension) is the only source kept in-tree.
-*.xz
-*.gz
-*.bz2
-*.zst
-*.tar
-*.tar.*
-*.tgz
-*.zip

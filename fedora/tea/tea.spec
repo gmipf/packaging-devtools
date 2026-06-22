@@ -10,11 +10,14 @@ Summary:        Command-line tool to interact with Gitea and Forgejo
 
 License:        MIT
 URL:            https://gitea.com/gitea/tea
-# Official upstream prebuilt static binary (repackaged, not built here).
-Source0:        tea-0.14.1-linux-amd64.xz
-# LICENSE shipped locally (flat source): gitea.com /raw/ and /archive/ return an
-# HTML challenge in the build env and the release has no LICENSE asset. The
-# version watcher refreshes it from the API on upstream bumps.
+# Official upstream prebuilt static binary, VENDORED (committed flat next to this
+# spec) so the COPR build is hermetic/offline — the project runs enable_net=off
+# and COPR's source build has no network. The upstream-release watcher refreshes
+# this file on version bumps. Provenance:
+#   %%{url}/releases/download/v%%{version}/%%{name}-%%{version}-linux-amd64.xz
+Source0:        %{name}-%{version}-linux-amd64.xz
+# LICENSE shipped locally too (flat): the release ships no LICENSE asset and
+# gitea.com /raw/ + /archive/ return an HTML challenge. Watcher refreshes via API.
 Source1:        LICENSE
 
 # We repackage upstream's amd64 binary -> x86_64 only.
@@ -27,7 +30,7 @@ terminal, including against self-hosted instances.
 
 %prep
 # No upstream tarball: create an empty build dir and bring the local LICENSE in.
-%setup -q -c -T -n packaging-devtools-0.14.1
+%setup -q -c -T
 cp -p %{SOURCE1} LICENSE
 
 %build

@@ -5,23 +5,24 @@ srpm_build_deps:
   - rpmdevtools
 
 # Multi-package layout — one block per tool under packages:. With paths: set,
-# specfile_path and action-internal paths are relative to that path. This repo
-# holds only packaging recipes, so create-archive fetches Source0 via spectool
-# (a default `git archive HEAD` would only archive the spec).
+# specfile_path and action-internal paths are relative to that path. Sources are
+# vendored flat in each tool's dir (create-archive just hands Packit the binary;
+# a default `git archive HEAD` would only archive the spec).
 packages:
   tea:
     paths:
       - fedora/tea/
     specfile_path: tea.spec
     upstream_project_url: https://gitea.com/gitea/tea
-    # Repackage of the upstream prebuilt static linux-amd64 binary. spectool -g
-    # fetches the remote Source0 (.xz); the local LICENSE (Source1) is already
-    # flat in fedora/tea/. We return the binary as the primary archive anchor.
+    # Repackage of the upstream prebuilt static binary, VENDORED: Source0 (.xz)
+    # and the LICENSE (Source1) are committed flat in fedora/tea/, so create-
+    # archive only points Packit at the already-present binary — NOTHING is
+    # fetched. Keeps COPR's source build hermetic (enable_net=off, no network).
+    # The upstream-release watcher (not the build) refreshes the vendored binary.
     actions:
       get-current-version:
         - bash -c "rpmspec -q --queryformat '%{version}\n' tea.spec | head -1"
       create-archive:
-        - bash -c "spectool -g tea.spec 1>&2"
         - bash -c "ls -1 tea-*-linux-amd64.xz | head -1"
 
 jobs:
