@@ -14,8 +14,10 @@ name: watch-tea-releases
 # reliable. The man page needs NO action: it's regenerated from the new binary at
 # build time (`tea man`), so it can never drift from the shipped version.
 #
-# Loud-fail (manual review) if the tag isn't vX.Y.Z or the download isn't a valid
-# xz-compressed ELF — we must never commit a broken Source0.
+# Supply chain: tea publishes a per-asset <asset>.xz.sha256 (matching its signed
+# checksums.txt); we verify the download against that hash before vendoring.
+# Loud-fail (manual review) if the tag isn't vX.Y.Z, the SHA256 mismatches, or the
+# payload isn't a valid xz-compressed ELF — never commit a broken/unverified Source0.
 
 on:
   schedule:
@@ -60,12 +62,21 @@ jobs:
           XZ=$DIR/tea-${VERSION}-linux-amd64.xz
           URL=https://gitea.com/gitea/tea/releases/download/${UPSTREAM_TAG}/tea-${VERSION}-linux-amd64.xz
 
-          # Re-vendor: download to a temp, then fully decompress it as validation
-          # (a bad/HTML body or truncated stream fails here) and confirm the payload
-          # is a Linux ELF before we ever touch the tree. -f makes curl fail on HTTP
-          # errors, so a 404 can't slip an error page through.
+          # Re-vendor: download to a temp (-f makes curl fail on HTTP errors so a
+          # 404 can't slip an error page through), verify it against upstream's
+          # published per-asset SHA256, then fully decompress it as a second check
+          # and confirm the payload is a Linux ELF before we ever touch the tree.
           TMP=$(mktemp); DEC=$(mktemp)
           curl -fsSL "$URL" -o "$TMP"
+          # tea ships <asset>.xz.sha256 (matching its signed checksums.txt); a
+          # mismatch means a corrupted or tampered download — refuse to vendor.
+          curl -fsSL "${URL}.sha256" -o "$TMP.sha256"
+          EXPECT=$(awk '{print $1}' "$TMP.sha256")
+          ACTUAL=$(sha256sum "$TMP" | awk '{print $1}')
+          if [ -z "$EXPECT" ] || [ "$EXPECT" != "$ACTUAL" ]; then
+            echo "::error::SHA256 mismatch for ${XZ##*/} (want ${EXPECT:-none}, got $ACTUAL) — refusing to vendor"
+            exit 1
+          fi
           if ! xz -dc "$TMP" > "$DEC" 2>/dev/null; then
             echo "::error::$URL is not a valid xz stream — refusing to vendor"
             exit 1

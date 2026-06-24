@@ -57,4 +57,5 @@ only that one package rebuilds.
 
 | Tool | Description | Status |
 |------|-------------|--------|
-| [tea](fedora/tea/) | Gitea / Forgejo CLI | in progress (first package) |
+| [tea](fedora/tea/) | Gitea / Forgejo CLI | live |
+| [syft](fedora/syft/) | Anchore SBOM generator (SPDX / CycloneDX) | live |
