@@ -1,0 +1,143 @@
+name: watch-syft-releases
+
+# syft releases on GitHub (anchore/syft), tagged vX.Y.Z. We poll daily, read the
+# latest release tag via the GitHub CLI and, on a new tag: re-vendor the upstream
+# static linux_amd64 release tarball (committed verbatim — its filename carries
+# the version), bump Version + reset Release in the spec, prepend a %changelog
+# entry, commit to main and force-push the build-syft trigger branch so Packit
+# fires exactly the syft COPR build. This automates, on every real upstream
+# release, what a human would run as `scripts/build-tool.sh syft` by hand.
+#
+# Like the tea watcher this re-vendors a committed BINARY artifact (git rm the old
+# tarball, download + validate the new one, git add it). COPR's build stays
+# offline (enable_net=off) — the network only happens HERE, where it's reliable.
+# The man page (help2man) and shell completions need NO action: both are
+# regenerated from the new binary at build time, so they can never drift from the
+# shipped version.
+#
+# Supply chain: we vendor the VERBATIM upstream tarball and verify its SHA256
+# against the checksums.txt published in the same release (Anchore cosign-signs
+# that file; verifying the cosign signature of checksums.txt is a possible future
+# hardening). Loud-fail (manual review) if the tag isn't vX.Y.Z, the checksum
+# doesn't match, or the payload isn't a valid gzip'd ELF — we must never commit a
+# broken or unverified Source0.
+
+on:
+  schedule:
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Sync syft spec + re-vendor tarball on a new upstream release
+        run: |
+          set -euo pipefail
+          DIR=fedora/syft
+          SPEC=$DIR/syft.spec
+          MARKER=$DIR/.upstream-tag
+
+          UPSTREAM_TAG=$(gh release view --repo anchore/syft --json tagName -q .tagName)
+          if [ -z "$UPSTREAM_TAG" ] || [ "$UPSTREAM_TAG" = "null" ]; then
+            echo "::error::Could not read latest syft release tag from GitHub"
+            exit 1
+          fi
+          if ! printf '%s' "$UPSTREAM_TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Unexpected syft tag '$UPSTREAM_TAG' (want vX.Y.Z) — upstream may have changed naming; manual review"
+            exit 1
+          fi
+
+          LOCAL_TAG=$(cat "$MARKER" 2>/dev/null || echo none)
+          if [ "$UPSTREAM_TAG" = "$LOCAL_TAG" ]; then
+            echo "Tag unchanged ($LOCAL_TAG) — no rebuild needed"
+            exit 0
+          fi
+          echo "Upstream tag changed: $LOCAL_TAG -> $UPSTREAM_TAG"
+
+          VERSION=${UPSTREAM_TAG#v}
+          TARBALL=syft_${VERSION}_linux_amd64.tar.gz
+          DEST=$DIR/$TARBALL
+          BASE=https://github.com/anchore/syft/releases/download/${UPSTREAM_TAG}
+
+          # Re-vendor: download the tarball + the release's checksums.txt, verify
+          # the published SHA256 (-f makes curl fail on HTTP errors so a 404 can't
+          # slip an error page through), then extract just the `syft` member and
+          # confirm it's a Linux ELF before we ever touch the tree.
+          TMP=$(mktemp); SUMS=$(mktemp); EXDIR=$(mktemp -d)
+          curl -fsSL "$BASE/$TARBALL" -o "$TMP"
+          curl -fsSL "$BASE/syft_${VERSION}_checksums.txt" -o "$SUMS"
+          EXPECT=$(grep "  ${TARBALL}\$" "$SUMS" | awk '{print $1}')
+          ACTUAL=$(sha256sum "$TMP" | awk '{print $1}')
+          if [ -z "$EXPECT" ]; then
+            echo "::error::No checksum for $TARBALL in upstream checksums.txt"
+            exit 1
+          fi
+          if [ "$EXPECT" != "$ACTUAL" ]; then
+            echo "::error::SHA256 mismatch for $TARBALL (want $EXPECT, got $ACTUAL) — refusing to vendor"
+            exit 1
+          fi
+          if ! tar xzf "$TMP" -C "$EXDIR" syft 2>/dev/null; then
+            echo "::error::$TARBALL is not a valid gzip tarball containing 'syft' — refusing to vendor"
+            exit 1
+          fi
+          MAGIC=$(od -An -tx1 -N4 "$EXDIR/syft" | tr -d ' \n')
+          if [ "$MAGIC" != "7f454c46" ]; then
+            echo "::error::Bundled syft is not an ELF (magic ${MAGIC:-empty}) — refusing to vendor"
+            exit 1
+          fi
+          rm -rf "$EXDIR"
+
+          # The tarball filename carries the version, so the new file is a new
+          # path: drop the old one, drop the new one in, stage both moves.
+          git rm -q "$DIR"/syft_*_linux_amd64.tar.gz
+          mv "$TMP" "$DEST"
+          git add "$DEST"
+
+          # New upstream release = fresh identity: reset the packaging-iteration
+          # counter and prepend a %changelog entry (LC_ALL=C for an English date;
+          # EVR without %{?dist} to match the hand-written entries).
+          echo "$UPSTREAM_TAG" > "$MARKER"
+          sed -i "s|^Version:.*|Version:        ${VERSION}|" "$SPEC"
+          sed -i "s/^Release:.*/Release:        1%{?dist}/" "$SPEC"
+          CL_ENTRY=$(mktemp)
+          {
+            printf '* %s gmipf <gmipf64@gmail.com> - %s-1\n' \
+              "$(LC_ALL=C date -u +'%a %b %d %Y')" "$VERSION"
+            printf -- '- Automated sync to upstream syft release %s; re-vendored linux_amd64 tarball (SHA256-verified), Release reset to 1.\n' "$UPSTREAM_TAG"
+            printf '\n'
+          } > "$CL_ENTRY"
+          sed -i "/^%changelog/r $CL_ENTRY" "$SPEC"
+          rm -f "$CL_ENTRY"
+
+          git add "$SPEC" "$MARKER"
+          if git diff --cached --quiet; then
+            echo "Nothing staged after rewrite — exiting clean"
+            exit 0
+          fi
+
+          git config user.name "rolling-watcher"
+          git config user.email "actions@github.com"
+          # The vendored tarball is ~28 MB; lift the post buffer so the push doesn't
+          # fall back to a chunked body that must rewind on redirect ("cannot rewind
+          # RPC post data"). Same workaround as scripts/build-tool.sh.
+          git config http.postBuffer 524288000
+          git commit -m "chore: syft ${UPSTREAM_TAG}"
+
+          # main is canonical and builds NOTHING (the copr_build job is scoped to
+          # branch build-syft). The trigger branch = main's tree + a cosmetic
+          # landing README; force-pushing it fires ONLY the syft COPR job via
+          # Packit. Same mechanism as scripts/build-tool.sh — never hand-push main.
+          git push origin HEAD:main
+          git checkout -q -b trigger-tmp
+          printf '# build-syft — syft (Fedora/COPR trigger branch)\n\nAuto-managed **trigger branch** for the `syft` package: a push here fires\nthe syft COPR build via Packit, nothing else rebuilds. Canonical source is\n`main` (do not edit here). Packaging: `fedora/syft/`.\n' > README.md
+          git add README.md
+          git commit -q -m "trigger: syft build (${VERSION}-1)"
+          git push -f origin trigger-tmp:build-syft

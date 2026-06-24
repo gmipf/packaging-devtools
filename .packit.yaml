@@ -24,6 +24,21 @@ packages:
         - bash -c "rpmspec -q --queryformat '%{version}\n' tea.spec | head -1"
       create-archive:
         - bash -c "ls -1 tea-*-linux-amd64.xz | head -1"
+  syft:
+    paths:
+      - fedora/syft/
+    specfile_path: syft.spec
+    upstream_project_url: https://github.com/anchore/syft
+    # Same vendored-binary model as tea: the verbatim upstream linux_amd64
+    # release tarball (binary + LICENSE/README/CHANGELOG) is committed flat in
+    # fedora/syft/, so create-archive only points Packit at the present tarball
+    # — NOTHING is fetched, COPR's source build stays hermetic (enable_net=off).
+    # The upstream-release watcher refreshes the vendored tarball on bumps.
+    actions:
+      get-current-version:
+        - bash -c "rpmspec -q --queryformat '%{version}\n' syft.spec | head -1"
+      create-archive:
+        - bash -c "ls -1 syft_*_linux_amd64.tar.gz | head -1"
 
 jobs:
   # Branch-scoped commit job: only a push to build-tea fires this build (a push
@@ -34,6 +49,15 @@ jobs:
     trigger: commit
     branch: build-tea
     packages: [tea]
+    update_release: false
+    owner: gmipf
+    project: devtools
+    targets:
+      - fedora-all-x86_64
+  - job: copr_build
+    trigger: commit
+    branch: build-syft
+    packages: [syft]
     update_release: false
     owner: gmipf
     project: devtools
