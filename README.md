@@ -59,3 +59,5 @@ only that one package rebuilds.
 |------|-------------|--------|
 | [tea](fedora/tea/) | Gitea / Forgejo CLI | live |
 | [syft](fedora/syft/) | Anchore SBOM generator (SPDX / CycloneDX) | live |
+| [grype](fedora/grype/) | Anchore vulnerability scanner (images / filesystems / SBOMs) | live |
+| [grant](fedora/grant/) | Anchore license checker (images / SBOMs / filesystems) | live |
