@@ -4,7 +4,7 @@
 %global debug_package %{nil}
 
 Name:           tea
-Version:        0.14.2
+Version:        0.15.0
 Release:        1%{?dist}
 Summary:        Command-line tool to interact with Gitea and Forgejo
 
@@ -56,6 +56,9 @@ install -D -p -m0644 %{name}.1 %{buildroot}%{_mandir}/man1/%{name}.1
 %{_mandir}/man1/%{name}.1*
 
 %changelog
+* Tue Jul 28 2026 gmipf <gmipf64@gmail.com> - 0.15.0-1
+- Automated sync to upstream tea release v0.15.0; re-vendored linux-amd64 binary, Release reset to 1.
+
 * Sat Jun 27 2026 gmipf <gmipf64@gmail.com> - 0.14.2-1
 - Automated sync to upstream tea release v0.14.2; re-vendored linux-amd64 binary, Release reset to 1.
 
