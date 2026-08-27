@@ -5,7 +5,7 @@
 %global debug_package %{nil}
 
 Name:           syft
-Version:        1.51.0
+Version:        1.51.1
 Release:        1%{?dist}
 Summary:        CLI tool for generating a Software Bill of Materials (SBOM)
 
@@ -74,6 +74,9 @@ install -D -p -m0644 %{name}.fish %{buildroot}%{_datadir}/fish/vendor_completion
 %{_datadir}/fish/vendor_completions.d/%{name}.fish
 
 %changelog
+* Thu Aug 27 2026 gmipf <gmipf64@gmail.com> - 1.51.1-1
+- Automated sync to upstream syft release v1.51.1; re-vendored linux_amd64 tarball (SHA256-verified), Release reset to 1.
+
 * Tue Aug 11 2026 gmipf <gmipf64@gmail.com> - 1.51.0-1
 - Automated sync to upstream syft release v1.51.0; re-vendored linux_amd64 tarball (SHA256-verified), Release reset to 1.
 
