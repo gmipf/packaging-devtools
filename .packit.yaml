@@ -77,7 +77,7 @@ jobs:
   # stays false so the published NEVRA is exactly the spec's (clean bare-N).
   - job: copr_build
     trigger: commit
-    branch: build-tea
+    branch: ^build-tea$
     packages: [tea]
     update_release: false
     owner: gmipf
@@ -86,7 +86,7 @@ jobs:
       - fedora-all-x86_64
   - job: copr_build
     trigger: commit
-    branch: build-syft
+    branch: ^build-syft$
     packages: [syft]
     update_release: false
     owner: gmipf
@@ -95,7 +95,7 @@ jobs:
       - fedora-all-x86_64
   - job: copr_build
     trigger: commit
-    branch: build-grype
+    branch: ^build-grype$
     packages: [grype]
     update_release: false
     owner: gmipf
@@ -104,7 +104,7 @@ jobs:
       - fedora-all-x86_64
   - job: copr_build
     trigger: commit
-    branch: build-grant
+    branch: ^build-grant$
     packages: [grant]
     update_release: false
     owner: gmipf
