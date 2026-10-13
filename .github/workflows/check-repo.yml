@@ -28,7 +28,7 @@ jobs:
     container: registry.fedoraproject.org/fedora:latest
     steps:
       - name: Install the linters
-        run: dnf -y -q install git-core tar gzip /usr/bin/shellcheck /usr/bin/ruff /usr/bin/yamllint /usr/bin/packit /usr/bin/rpmlint rpm-build
+        run: dnf -y -q install git-core tar gzip /usr/bin/shellcheck /usr/bin/ruff /usr/bin/yamllint /usr/bin/packit /usr/bin/rpmlint rpm-build python3-rpm python3-pyyaml jq xz
 
       # Not packaged for Fedora. The release binary, pinned by version AND by
       # checksum -- the hash below was read from a download verified against the
@@ -53,6 +53,11 @@ jobs:
       - name: scripts/lint.sh
         run: bash scripts/lint.sh
 
+      # Every check above, run against a defect planted for it: a check that
+      # can no longer turn red fails here instead of passing everything.
+      - name: scripts/selftest.py
+        run: python3 scripts/selftest.py
+
   # A push to main builds nothing on COPR, so a spec edited there would first
   # be built when the next upstream release bumps it -- and that release would
   # be stuck. This builds every spec now, the way COPR would, %check included.
@@ -60,7 +65,20 @@ jobs:
     runs-on: ubuntu-latest
     container: registry.fedoraproject.org/fedora:latest
     steps:
+      # The image has neither (measured, Fedora 44). git must come before the
+      # checkout, which otherwise downloads the files without .git -- and the
+      # selftest copies what git tracks.
+      - name: Install git and python3
+        run: dnf -y -q install git-core python3
+
       - uses: actions/checkout@v5
+
+      - name: Trust the checkout
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: scripts/rpmbuild-check.sh
         run: bash scripts/rpmbuild-check.sh --install-deps
+
+      # One typical packaging fault per spec, each of which its %check must catch.
+      - name: scripts/selftest.py --rpmbuild
+        run: python3 scripts/selftest.py --rpmbuild

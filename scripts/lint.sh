@@ -7,8 +7,10 @@
 #   scripts/lint.sh --hook   pre-commit (.githooks): a tool that is not installed
 #                            here is named and skipped -- CI still runs it
 #
-# Every rule was measured before it was switched on and seen red on a planted
-# defect (2026-10-13). A finding fails the run; nothing here only warns.
+# Every rule was measured before it was switched on, and scripts/selftest.py
+# sees each one red on a planted defect in every CI run -- edit a rule here and
+# its defect there must still be caught. A finding fails the run; nothing here
+# only warns.
 #
 #   whitespace   text files: no trailing blanks, no CR, a final newline
 #                (.editorconfig tells editors the same)
@@ -23,6 +25,8 @@
 #   packit       .packit.yaml against Packit's own schema
 #   rpmlint      every spec; the expected findings are DECLARED below and
 #                checked both ways
+#   tests        scripts/test-*.py: reconciler decisions, .packit.yaml rules,
+#                every package through a simulated upstream bump
 #   coverage     a tracked file type no rule here understands (XML, .desktop,
 #                manpage) is red until a rule for it exists
 set -uo pipefail
@@ -151,6 +155,27 @@ if have rpmlint; then
             bad "rpmlint no longer reports these -- take them off EXPECTED in scripts/lint.sh:"; printf '%s\n' "$gone" >&2
         fi
         [ -n "$unexpected$gone" ] || ok "rpmlint (${#specs[@]} specs, $(wc -l <<<"$want") declared findings)"
+    fi
+fi
+
+# --- tests ------------------------------------------------------------------
+# The offline test suites: the reconciler's decisions, the .packit.yaml rules
+# it relies on (update_release false, no suffix, get-current-version), and
+# every package through a simulated upstream bump. Run here so that a change to
+# .packit.yaml or a spec meets them before it is pushed, not 6 hours later in
+# copr-reconcile. They need rpm's Python bindings and PyYAML.
+if have python3; then
+    mapfile -t suites < <(git ls-files 'scripts/test-*.py')
+    if [ "${#suites[@]}" -lt 2 ]; then
+        bad "tests: only ${#suites[@]} suites found -- the layout moved"
+    elif ! python3 -c 'import rpm, yaml' 2>/dev/null; then
+        if [ "$HOOK" = 1 ]; then skipped="$skipped python3-rpm/python3-pyyaml"
+        else bad "tests: python3 cannot import rpm and yaml -- not measured is not clean"; fi
+    else
+        for t in "${suites[@]}"; do
+            if out=$(python3 -B "$t" 2>&1); then ok "$t ($(tail -1 <<<"$out"))"
+            else bad "$t:"; grep -v '^PASS' <<<"$out" >&2; fi
+        done
     fi
 fi
 

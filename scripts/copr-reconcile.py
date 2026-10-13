@@ -95,6 +95,21 @@ def jobs(packit_yaml):
         # One package per trigger branch -- that IS the routing. Fail loudly on more.
         (pkg,) = job["packages"]
         p = cfg["packages"][pkg]
+        # judge() predicts the NEVRA Packit builds by running rpmspec on the
+        # committed spec. That holds only while Packit leaves Version and Release
+        # alone: update_release false (the job, its package or the top level --
+        # Packit's default is true and appends a timestamp), no version_suffix or
+        # release_suffix, and a get-current-version action -- without one Packit
+        # takes the version from the newest git tag of this repository. Otherwise
+        # COPR would never have main's NEVRA and every run would re-push.
+        layers = (job, p, cfg)
+        if next((d["update_release"] for d in layers if "update_release" in d), True) is not False:
+            sys.exit(f"copr_build job for {pattern!r}: update_release is not false")
+        for key in ("version_suffix", "release_suffix"):
+            if any(d.get(key) is not None for d in layers):
+                sys.exit(f"copr_build job for {pattern!r}: {key} is set")
+        if not (p.get("actions") or {}).get("get-current-version"):
+            sys.exit(f"package {pkg!r} has no get-current-version action")
         (pkgdir,) = p["paths"]
         pkgdir = pkgdir.rstrip("/")
         out.append((pkg, branch, pkgdir, f"{pkgdir}/{p['specfile_path']}", owner, project))

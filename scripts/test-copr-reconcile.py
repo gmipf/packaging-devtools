@@ -22,6 +22,13 @@ import tempfile
 # No scripts/__pycache__: copr-reconcile.yml runs this right before --heal, and
 # a stray file there would make the working tree look dirty to it.
 sys.dont_write_bytecode = True
+# Run from the pre-commit hook (via lint.sh), git exports GIT_INDEX_FILE -- for
+# `git commit -a` as an absolute path to the index of the repository being
+# committed. heal_checks() runs git in a throwaway repository and would work on
+# that index instead -- measured: the suite then breaks and the hook refuses
+# every `commit -a` (selftest.py keeps it so). Nothing here needs any GIT_*.
+for k in [k for k in os.environ if k.startswith("GIT_")]:
+    del os.environ[k]
 HERE = pathlib.Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location("rec", os.environ.get("REC", HERE / "copr-reconcile.py"))
 rec = importlib.util.module_from_spec(spec)
@@ -99,14 +106,30 @@ def routing_checks():
             bool(asked) and all("ownername=gmipf&projectname=other-proj&" in p for p in asked)}
 
 
-JOB = """
-packages:
-  pkg: {paths: [fedora/pkg/], specfile_path: pkg.spec}
-  two: {paths: [fedora/two/], specfile_path: two.spec}
-jobs:
-  - {job: copr_build, trigger: commit, branch: %s, packages: %s, owner: %s, project: devtools}
-  - {job: copr_build, trigger: pull_request, packages: [pkg]}
-"""
+DROP = object()
+
+
+def packit(job=None, pkg=None, top=None):
+    """A minimal .packit.yaml that jobs() accepts, with keys of the commit job,
+    of package 'pkg' and of the top level overridden (DROP removes a key)."""
+    def apply(d, over):
+        for k, v in (over or {}).items():
+            if v is DROP:
+                d.pop(k, None)
+            else:
+                d[k] = v
+        return d
+
+    gcv = {"get-current-version": ["true"]}
+    cfg = apply({"packages": {
+        "pkg": apply({"paths": ["fedora/pkg/"], "specfile_path": "pkg.spec", "actions": gcv}, pkg),
+        "two": {"paths": ["fedora/two/"], "specfile_path": "two.spec", "actions": gcv},
+    }, "jobs": [
+        apply({"job": "copr_build", "trigger": "commit", "branch": "^build-pkg$", "packages": ["pkg"],
+               "update_release": False, "owner": "gmipf", "project": "devtools"}, job),
+        {"job": "copr_build", "trigger": "pull_request", "packages": ["pkg"]},
+    ]}, top)
+    return rec.yaml.safe_dump(cfg)
 
 
 def raises(text):
@@ -118,16 +141,26 @@ def raises(text):
 
 
 def jobs_checks():
-    good = rec.jobs(JOB % ("^build-pkg$", "[pkg]", "gmipf"))
+    good = [("pkg", "build-pkg", "fedora/pkg", "fedora/pkg/pkg.spec", "gmipf", "devtools")]
     return {
-        "anchored job parsed, non-commit job skipped":
-            good == [("pkg", "build-pkg", "fedora/pkg", "fedora/pkg/pkg.spec", "gmipf", "devtools")],
-        "unanchored branch refused": raises(JOB % ("build-pkg", "[pkg]", "gmipf")),
-        "half-anchored branch refused": raises(JOB % ("^build-pkg", "[pkg]", "gmipf")),
-        "regex in branch refused": raises(JOB % ("^build-.*$", "[pkg]", "gmipf")),
-        "job without owner refused": raises(JOB % ("^build-pkg$", "[pkg]", "''")),
-        "two packages on one trigger refused": raises(JOB % ("^build-pkg$", "[pkg, two]", "gmipf")),
+        "anchored job parsed, non-commit job skipped": rec.jobs(packit()) == good,
+        "unanchored branch refused": raises(packit(job={"branch": "build-pkg"})),
+        "half-anchored branch refused": raises(packit(job={"branch": "^build-pkg"})),
+        "regex in branch refused": raises(packit(job={"branch": "^build-.*$"})),
+        "job without owner refused": raises(packit(job={"owner": ""})),
+        "two packages on one trigger refused": raises(packit(job={"packages": ["pkg", "two"]})),
         "no commit job at all refused": raises("packages: {}\njobs: []\n"),
+        # NEVRA: Packit must leave Version and Release as the spec has them.
+        "update_release missing (Packit default true) refused": raises(packit(job={"update_release": DROP})),
+        "update_release true refused": raises(packit(job={"update_release": True})),
+        "update_release false at the top level accepted":
+            rec.jobs(packit(job={"update_release": DROP}, top={"update_release": False})) == good,
+        "job's update_release true over a false package refused":
+            raises(packit(job={"update_release": True}, pkg={"update_release": False})),
+        "version_suffix at the top level refused": raises(packit(top={"version_suffix": "^{PACKIT_PROJECT_SNAPSHOTID}"})),
+        "release_suffix on the package refused": raises(packit(pkg={"release_suffix": "x"})),
+        "release_suffix: null (stop inheriting) accepted": rec.jobs(packit(job={"release_suffix": None})) == good,
+        "package without get-current-version refused": raises(packit(pkg={"actions": {}})),
     }
 
 
@@ -141,8 +174,11 @@ def repo_checks():
     for entry in re.findall(r'^TOOLS\[[^]]+\]="([^"]+)"', conf, re.M):
         f = entry.split("|")
         tools[f[0]] = (f[2], f[1], owner, f[3] if len(f) > 3 and f[3] else default)
-    got = {pkg: (branch, spec, o, p)
-           for pkg, branch, _, spec, o, p in rec.jobs((root / ".packit.yaml").read_text())}
+    try:
+        parsed = rec.jobs((root / ".packit.yaml").read_text())
+    except SystemExit as e:
+        return {f"jobs() accepts the real .packit.yaml ({e})": False}
+    got = {pkg: (branch, spec, o, p) for pkg, branch, _, spec, o, p in parsed}
     return {
         f"packaging.conf and .packit.yaml route the same {len(tools)} tools": bool(tools) and got == tools,
     }

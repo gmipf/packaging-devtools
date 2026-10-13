@@ -37,9 +37,13 @@ files move.
 Four additions, nothing else changes:
 
 1. `fedora/<app>/<app>.spec` (+ flat sources, manpage, watcher state file).
-2. A `packages:` block in `.packit.yaml` (`paths: fedora/<app>/`, `specfile_path: <app>.spec`)
-   and a `copr_build` job with `branch: ^build-<app>$` plus `owner`/`project`
-   (`scripts/test-copr-reconcile.py` checks that it routes exactly like `packaging.conf`).
+2. A `packages:` block in `.packit.yaml` (`paths: fedora/<app>/`, `specfile_path: <app>.spec`,
+   a `get-current-version` action that reads the spec and a `create-archive` action that
+   matches the vendored Source0 by its form, never by its version) and a `copr_build` job
+   with `branch: ^build-<app>$`, `update_release: false` and `owner`/`project`.
+   `scripts/test-copr-reconcile.py` checks that it routes exactly like `packaging.conf` and
+   that Packit leaves the NEVRA alone; `scripts/test-packit-config.py` runs both actions
+   through a simulated upstream bump.
 3. One line in `packaging.conf`:
    `TOOLS[<app>]="<copr-package>|fedora/<app>/<app>.spec|build-<app>[|<copr-project>]"`.
 4. An upstream-release watcher workflow.
@@ -67,9 +71,10 @@ Run `scripts/copr-reconcile.py` for the same report locally (`--heal` only in CI
 ## Checks
 
 `scripts/lint.sh` holds every lint rule (whitespace, shellcheck, ruff, yamllint, actionlint,
-`packit validate`, rpmlint with a declared list of expected findings). CI runs it with every
-tool installed (`check-repo.yml`, on push, on pull requests and daily); locally it runs as a
-pre-commit hook, skipping tools that are not installed:
+`packit validate`, rpmlint with a declared list of expected findings) and runs the offline
+test suites (`scripts/test-*.py`). CI runs it with every tool installed (`check-repo.yml`,
+on push, on pull requests and daily); locally it runs as a pre-commit hook, skipping tools
+that are not installed:
 
 ```sh
 git config core.hooksPath .githooks
@@ -80,6 +85,11 @@ version, and the man page and completions rendered from it must not be empty.
 `scripts/rpmbuild-check.sh` builds every spec that way in CI (`check-repo.yml`, job
 `rpmbuild`), since a push to `main` builds nothing on Copr; the script's header shows the
 `docker run` line for a local run.
+
+A check that cannot fail looks exactly like one that passes. `scripts/selftest.py` plants a
+defect for every check above (every lint rule, every test-suite decision, the hook, each
+spec's `%check` with `--rpmbuild`) in a throwaway copy and requires each to turn red for
+its own reason; CI runs it in both jobs.
 
 ## Tools
 
