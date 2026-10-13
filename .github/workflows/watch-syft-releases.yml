@@ -135,9 +135,9 @@ jobs:
           # branch build-syft). The trigger branch = main's tree + a cosmetic
           # landing README; force-pushing it fires ONLY the syft COPR job via
           # Packit. Same mechanism as scripts/build-tool.sh — never hand-push main.
-          git push origin HEAD:main
+          bash scripts/push-retry.sh origin HEAD:main
           git checkout -q -b trigger-tmp
           printf '# build-syft — syft (Fedora/COPR trigger branch)\n\nAuto-managed **trigger branch** for the `syft` package: a push here fires\nthe syft COPR build via Packit, nothing else rebuilds. Canonical source is\n`main` (do not edit here). Packaging: `fedora/syft/`.\n' > README.md
           git add README.md
           git commit -q -m "trigger: syft build (${VERSION}-1)"
-          git push -f origin trigger-tmp:build-syft
+          bash scripts/push-retry.sh -f origin trigger-tmp:build-syft
