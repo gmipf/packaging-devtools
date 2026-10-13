@@ -26,7 +26,8 @@
 #   rpmlint      every spec; the expected findings are DECLARED below and
 #                checked both ways
 #   tests        scripts/test-*.py: reconciler decisions, .packit.yaml rules,
-#                every package through a simulated upstream bump
+#                every package through a simulated upstream bump, every
+#                watcher against a fake upstream, proofs/ledger.tsv still true
 #   coverage     a tracked file type no rule here understands (XML, .desktop,
 #                manpage) is red until a rule for it exists
 set -uo pipefail

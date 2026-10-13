@@ -96,6 +96,14 @@ def drop_final_newline(path):
     return plant
 
 
+def remove(path):
+    def plant(w):
+        if not (w / path).is_file():
+            raise DoesNotApply(f"{path} does not exist")
+        (w / path).unlink()
+    return plant
+
+
 def add_tracked(path, text):
     def plant(w):
         (w / path).write_text(text)
@@ -188,6 +196,20 @@ LINT = [
      replace(".github/workflows/watch-syft-releases.yml",
              "          bash scripts/push-retry.sh -f origin trigger-tmp:build-syft\n", ""),
      r"FAIL  syft: trigger: build branch is main plus its landing page"),
+    # proofs/ledger.tsv: an observation must not outlive its mechanism
+    ("ledger: a job changed, its observation kept",
+     replace(".packit.yaml", "targets:\n      - fedora-all-x86_64\n",
+             "targets:\n      - fedora-all-x86_64\n      - fedora-all-aarch64\n"), r"DRIFT: \.packit\.yaml#jobs"),
+    ("ledger: a comment in .packit.yaml is no mechanism change",
+     replace(".packit.yaml", "  # Branch-scoped commit job", "  # Branch-scoped (reworded) commit job"), None),
+    ("ledger: evidence file missing", remove("proofs/packit-routing.md"),
+     r"evidence proofs/packit-routing\.md does not exist"),
+    ("ledger: evidence without a VERDICT", replace("proofs/packit-routing.md", "\nVERDICT:", "\nVerdict:"),
+     r"has no VERDICT line"),
+    ("ledger: a mechanism function renamed", replace(REC, "def heal(", "def heal_trigger("),
+     r"mechanism file gone or moved: .*no function or class 'heal'"),
+    ("ledger: unknown state", replace("proofs/ledger.tsv", "packit-routing|observed|", "packit-routing|assumed|"),
+     r"unknown state 'assumed'"),
     # the reconciler's decisions, broken one at a time
     ("reconcile: no grace period", replace(REC, "GRACE = 3600", "GRACE = 0"), r"FAIL  fresh"),
     ("reconcile: a failed build of main's NEVRA ignored", replace(REC, "    if tried:\n", "    if False and tried:\n"),
@@ -230,6 +252,8 @@ def one_lint_mutant(w, label, plant, expect):
     if not git(w, "status", "--porcelain").stdout.strip():
         return False, label, "planting the defect changed nothing"
     p = lint(w)
+    if expect is None:      # a harmless change: must NOT turn red
+        return p.returncode == 0, f"{label} (stays green)", f"exit {p.returncode}:\n" + tail(p.stdout)
     return (p.returncode != 0 and re.search(expect, p.stdout) is not None, label,
             f"exit {p.returncode}, wanted /{expect}/:\n" + tail(p.stdout))
 
@@ -372,7 +396,7 @@ def main():
         nonlocal gaps, total
         total += 1
         gaps += not red
-        print(f"{'RED ok' if red else 'GAP   '}  {label}" + ("" if red else f"\n{detail}"), flush=True)
+        print(f"{'ok ' if red else 'GAP'}  {label}" + ("" if red else f"\n{detail}"), flush=True)
 
     with tempfile.TemporaryDirectory() as tmp:
         w = pathlib.Path(tmp) / "w"
@@ -394,7 +418,7 @@ def main():
                 copies.append(c)
             run_lint_mutants(copies, verdict)
             run_special(w, verdict)
-    print(f"\n{total - gaps}/{total} defects caught")
+    print(f"\n{total - gaps}/{total} as expected")
     sys.exit(1 if gaps else 0)
 
 

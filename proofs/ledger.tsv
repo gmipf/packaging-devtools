@@ -1,0 +1,21 @@
+# proofs/ledger.tsv -- claims only the real services can show (Packit, Copr,
+# GitHub), each with a fingerprint of the files it rests on. Checked by
+# scripts/test-proofs.py (lint.sh runs it); its header has the rules.
+#
+# Everything that can be measured offline is not here but in a test suite,
+# and selftest.py sees each of those checks red on every CI run.
+#
+# To close an open entry: observe it, write proofs/<claim>.md (OBSERVED and
+# VERDICT lines; RED and GREEN for proven), set state, date and evidence,
+# mech_hash=AUTO, then scripts/test-proofs.py --refresh.
+#
+# copr-runs-check       Copr runs each spec's %check and the build passes
+#                       (CI's rpmbuild-check.sh does; that it is the same on
+#                       Copr is what the first watcher bump of each package shows)
+# reconcile-heals-live  copr-reconcile re-pushes a lost trigger on GitHub and
+#                       Copr builds it. Not provoked on purpose: losing a
+#                       trigger for real would leave a release unbuilt.
+claim|state|date|mech_hash|evidence|mech
+packit-routing|observed|2026-10-07|38a05ed7cd559a43|proofs/packit-routing.md|.packit.yaml#jobs
+copr-runs-check|not-yet|-|-|-|.packit.yaml#jobs
+reconcile-heals-live|not-yet|-|-|-|scripts/copr-reconcile.py#judge,scripts/copr-reconcile.py#heal,.github/workflows/copr-reconcile.yml

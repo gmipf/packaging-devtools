@@ -91,6 +91,12 @@ defect for every check above (every lint rule, every test-suite decision, the ho
 spec's `%check` with `--rpmbuild`) in a throwaway copy and requires each to turn red for
 its own reason; CI runs it in both jobs.
 
+What only the real services can show (how Packit routes a push, what Copr runs, what the
+reconciler does on GitHub) is in `proofs/ledger.tsv`: observed once, with the evidence in
+`proofs/` and a fingerprint of the files it rests on. `scripts/test-proofs.py` (run by
+`lint.sh`) turns red when such a file changes while the entry still claims the old
+observation.
+
 ## Tools
 
 | Tool | Description | Status |
