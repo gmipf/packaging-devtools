@@ -1,0 +1,8 @@
+# For editors. scripts/lint.sh enforces these rules on every tracked text file,
+# in CI and in the pre-commit hook.
+root = true
+
+[*]
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true

@@ -1,0 +1,24 @@
+#!/bin/bash
+#
+# Runs scripts/lint.sh --hook on every commit. Install once per clone:
+#
+#     git config core.hooksPath .githooks
+#
+# A linter that is not installed on this machine is named and skipped; CI
+# (check-repo.yml) runs every rule regardless, so a fresh clone without the
+# hook still cannot get a finding past main unnoticed.
+#
+# Not keyed on the checker's exec bit: lint.sh runs via `bash`, so an exec bit
+# lost in a sync or a checkout cannot switch the check off without a word.
+set -uo pipefail
+
+root=$(git rev-parse --show-toplevel) || exit 1
+if [ ! -f "$root/scripts/lint.sh" ]; then
+    echo "pre-commit: scripts/lint.sh is missing -- commit aborted." >&2
+    exit 1
+fi
+if ! bash "$root/scripts/lint.sh" --hook; then
+    echo
+    echo "pre-commit: lint finding (see above) -- commit aborted." >&2
+    exit 1
+fi

@@ -43,7 +43,7 @@ tar xzf %{SOURCE0}
 
 %build
 chmod +x %{name}
-# Normalise the bundled doc/license modes so %doc/%license always install them
+# Normalise the bundled doc/license modes so %%doc/%%license always install them
 # world-readable regardless of upstream's archive perms (grype's sibling tarball
 # ships CHANGELOG.md 0600 — guard against the same here on future releases).
 chmod 0644 README.md CHANGELOG.md LICENSE

@@ -64,6 +64,17 @@ re-pushes a version Copr has seen in any state, so the same NEVRA is never built
 failed build, Copr ahead of `main`, or an unanswered API turns the run red instead.
 Run `scripts/copr-reconcile.py` for the same report locally (`--heal` only in CI).
 
+## Checks
+
+`scripts/lint.sh` holds every lint rule (whitespace, shellcheck, ruff, yamllint, actionlint,
+`packit validate`, rpmlint with a declared list of expected findings). CI runs it with every
+tool installed (`check-repo.yml`, on push, on pull requests and daily); locally it runs as a
+pre-commit hook, skipping tools that are not installed:
+
+```sh
+git config core.hooksPath .githooks
+```
+
 ## Tools
 
 | Tool | Description | Status |

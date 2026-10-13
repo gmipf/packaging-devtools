@@ -137,6 +137,7 @@ jobs:
           # Packit. Same mechanism as scripts/build-tool.sh — never hand-push main.
           bash scripts/push-retry.sh origin HEAD:main
           git checkout -q -b trigger-tmp
+          # shellcheck disable=SC2016  # backticks are Markdown in the landing README, not a substitution
           printf '# build-grant — grant (Fedora/COPR trigger branch)\n\nAuto-managed **trigger branch** for the `grant` package: a push here fires\nthe grant COPR build via Packit, nothing else rebuilds. Canonical source is\n`main` (do not edit here). Packaging: `fedora/grant/`.\n' > README.md
           git add README.md
           git commit -q -m "trigger: grant build (${VERSION}-1)"

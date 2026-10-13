@@ -130,6 +130,7 @@ jobs:
           # mechanism as scripts/build-tool.sh — never hand-push main:build-tea.
           bash scripts/push-retry.sh origin HEAD:main
           git checkout -q -b trigger-tmp
+          # shellcheck disable=SC2016  # backticks are Markdown in the landing README, not a substitution
           printf '# build-tea — tea (Fedora/COPR trigger branch)\n\nAuto-managed **trigger branch** for the `tea` package: a push here fires\nthe tea COPR build via Packit, nothing else rebuilds. Canonical source is\n`main` (do not edit here). Packaging: `fedora/tea/`.\n' > README.md
           git add README.md
           git commit -q -m "trigger: tea build (${VERSION}-1)"

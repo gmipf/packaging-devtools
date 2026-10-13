@@ -137,6 +137,7 @@ jobs:
           # Packit. Same mechanism as scripts/build-tool.sh — never hand-push main.
           bash scripts/push-retry.sh origin HEAD:main
           git checkout -q -b trigger-tmp
+          # shellcheck disable=SC2016  # backticks are Markdown in the landing README, not a substitution
           printf '# build-syft — syft (Fedora/COPR trigger branch)\n\nAuto-managed **trigger branch** for the `syft` package: a push here fires\nthe syft COPR build via Packit, nothing else rebuilds. Canonical source is\n`main` (do not edit here). Packaging: `fedora/syft/`.\n' > README.md
           git add README.md
           git commit -q -m "trigger: syft build (${VERSION}-1)"

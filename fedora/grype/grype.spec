@@ -43,7 +43,7 @@ tar xzf %{SOURCE0}
 
 %build
 chmod +x %{name}
-# Upstream ships CHANGELOG.md mode 0600 in the tarball; %doc would install it
+# Upstream ships CHANGELOG.md mode 0600 in the tarball; %%doc would install it
 # non-readable (rpmlint E: non-readable). Normalise the bundled doc/license
 # modes so they land world-readable regardless of upstream's archive perms.
 chmod 0644 README.md CHANGELOG.md LICENSE
