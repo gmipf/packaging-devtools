@@ -121,18 +121,14 @@ fi
 # --- rpmlint ----------------------------------------------------------------
 # 2026-10-13: 10 warnings, 0 errors. 3 were macros in comments -- rpm expands
 # those too, and grant.spec really did render wrong (%license became the
-# License tag). Escaped as %%. The rest are expected and DECLARED here as
-# "<spec> <severity> <check>", checked both ways: a finding not on the list is
-# red, and so is a listed one that no longer occurs (take it off the list).
-#   no-%check-section  these specs repackage upstream binaries and nothing runs
-#                      them at build time yet
+# License tag). Escaped as %%. 4 were no-%check-section, gone since every spec
+# got a selftest %check (also 2026-10-13; scripts/rpmbuild-check.sh runs it).
+# The rest are expected and DECLARED here as "<spec> <severity> <check>",
+# checked both ways: a finding not on the list is red, and so is a listed one
+# that no longer occurs (take it off the list).
 #   invalid-url        Source0 is the vendored upstream tarball, committed next
 #                      to the spec, not a URL: COPR builds offline
 EXPECTED="
-grant.spec W no-%check-section
-grype.spec W no-%check-section
-syft.spec W no-%check-section
-tea.spec W no-%check-section
 grant.spec W invalid-url
 grype.spec W invalid-url
 syft.spec W invalid-url

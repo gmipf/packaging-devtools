@@ -50,6 +50,24 @@ chmod +x %{name}
 install -D -p -m0755 %{name} %{buildroot}%{_bindir}/%{name}
 install -D -p -m0644 %{name}.1 %{buildroot}%{_mandir}/man1/%{name}.1
 
+%check
+# Selftest of what this package ships, run on the builder (the binary is static
+# Go and needs nothing from the buildroot): it must start and report exactly the
+# version this spec packages -- a stale or swapped vendored binary fails here --
+# and the docs rendered from it must not be silently empty: a generator that
+# falls back to nothing still leaves a green build. The man page is already
+# compressed by now, hence zcat -f.
+v=$(%{buildroot}%{_bindir}/%{name} --version)
+echo "$v"
+case " $v " in
+  *[!0-9.]%{version}[!0-9.]*) ;;
+  *) echo "error: %{name} --version does not report %{version}" >&2; exit 1 ;;
+esac
+zcat -f %{buildroot}%{_mandir}/man1/%{name}.1* > %{name}.1.check
+# tea's own generator writes no version into .TH, so only presence and size.
+grep -q '^\.TH ' %{name}.1.check
+test "$(wc -l < %{name}.1.check)" -gt 20
+
 %files
 %license LICENSE
 %{_bindir}/%{name}

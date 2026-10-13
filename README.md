@@ -75,6 +75,12 @@ pre-commit hook, skipping tools that are not installed:
 git config core.hooksPath .githooks
 ```
 
+Every spec has a `%check` that runs the binary it ships: it must report exactly the packaged
+version, and the man page and completions rendered from it must not be empty.
+`scripts/rpmbuild-check.sh` builds every spec that way in CI (`check-repo.yml`, job
+`rpmbuild`), since a push to `main` builds nothing on Copr; the script's header shows the
+`docker run` line for a local run.
+
 ## Tools
 
 | Tool | Description | Status |

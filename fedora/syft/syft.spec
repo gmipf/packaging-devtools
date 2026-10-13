@@ -64,6 +64,29 @@ install -D -p -m0644 %{name}.bash %{buildroot}%{_datadir}/bash-completion/comple
 install -D -p -m0644 _%{name} %{buildroot}%{_datadir}/zsh/site-functions/_%{name}
 install -D -p -m0644 %{name}.fish %{buildroot}%{_datadir}/fish/vendor_completions.d/%{name}.fish
 
+%check
+# Selftest of what this package ships, run on the builder (the binary is static
+# Go and needs nothing from the buildroot): it must start and report exactly the
+# version this spec packages -- a stale or swapped vendored binary fails here --
+# and the docs rendered from it must not be silently empty: a generator that
+# falls back to nothing still leaves a green build. The man page is already
+# compressed by now, hence zcat -f.
+v=$(%{buildroot}%{_bindir}/%{name} --version)
+echo "$v"
+case " $v " in
+  *[!0-9.]%{version}[!0-9.]*) ;;
+  *) echo "error: %{name} --version does not report %{version}" >&2; exit 1 ;;
+esac
+zcat -f %{buildroot}%{_mandir}/man1/%{name}.1* > %{name}.1.check
+# help2man stamps the version it read from the binary into .TH.
+grep -q '^\.TH .*%{version}' %{name}.1.check
+test "$(wc -l < %{name}.1.check)" -gt 20
+for f in %{buildroot}%{_datadir}/bash-completion/completions/%{name} \
+         %{buildroot}%{_datadir}/zsh/site-functions/_%{name} \
+         %{buildroot}%{_datadir}/fish/vendor_completions.d/%{name}.fish; do
+  grep -q %{name} "$f"
+done
+
 %files
 %license LICENSE
 %doc README.md CHANGELOG.md

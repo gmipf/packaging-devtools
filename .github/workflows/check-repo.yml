@@ -4,6 +4,7 @@ name: check-repo
 # installed: a tool that is missing here fails the run, because not measured
 # is not clean. The pre-commit hook (.githooks) runs the same script but skips
 # what a machine does not have -- this job is what holds for every clone.
+# Next to it, every spec is built with its %check (scripts/rpmbuild-check.sh).
 #
 # The daily run is not decoration: the watchers commit with the built-in
 # GITHUB_TOKEN, and pushes made with it start no other workflow. Without the
@@ -51,3 +52,15 @@ jobs:
 
       - name: scripts/lint.sh
         run: bash scripts/lint.sh
+
+  # A push to main builds nothing on COPR, so a spec edited there would first
+  # be built when the next upstream release bumps it -- and that release would
+  # be stuck. This builds every spec now, the way COPR would, %check included.
+  rpmbuild:
+    runs-on: ubuntu-latest
+    container: registry.fedoraproject.org/fedora:latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: scripts/rpmbuild-check.sh
+        run: bash scripts/rpmbuild-check.sh --install-deps
