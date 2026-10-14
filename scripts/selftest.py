@@ -6,7 +6,7 @@ is run here against a defect planted for it, and must turn red for that
 defect's own reason. A check that is edited, refactored or bypassed until it
 no longer catches its defect turns this red instead of staying silently green.
 
-    scripts/selftest.py             lint.sh, the test suites and the hook
+    scripts/selftest.py             lint.sh, the test suites and both hooks
                                     (CI: check-repo.yml, job lint)
     scripts/selftest.py --rpmbuild  every spec's %check (needs the build deps:
                                     check-repo.yml, job rpmbuild)
@@ -76,6 +76,16 @@ def replace(path, old, new):
         if old not in s:
             raise DoesNotApply(f"{path}: {old!r} not found")
         f.write_text(s.replace(old, new, 1))
+    return plant
+
+
+def replace_all(path, old, new):
+    def plant(w):
+        f = w / path
+        s = f.read_text()
+        if old not in s:
+            raise DoesNotApply(f"{path}: {old!r} not found")
+        f.write_text(s.replace(old, new))
     return plant
 
 
@@ -210,6 +220,28 @@ LINT = [
      r"mechanism file gone or moved: .*no function or class 'heal'"),
     ("ledger: unknown state", replace("proofs/ledger.tsv", "packit-routing|observed|", "packit-routing|assumed|"),
      r"unknown state 'assumed'"),
+    # the texts: the tree against what a reader sees, and the checks' own decisions
+    ("changelog: a package without its Added line",
+     replace("CHANGELOG.md", "- Added `syft` on Fedora.", "- Packaged syft on Fedora."),
+     r"`syft` is built for Fedora \(fedora/syft/\), but no line adds it"),
+    ("texts: the README no longer names a package", replace_all("README.md", "grype", "gr_ype"),
+     r"texts-check: README\.md: does not name `grype`"),
+    ("texts: how-it-works no longer names a workflow",
+     replace_all("docs/how-it-works.md", "copr-reconcile.yml", "copr-reconcile"),
+     r"texts-check: docs/how-it-works\.md: does not name copr-reconcile\.yml"),
+    ("docs-gate: packaging.conf not a recipe",
+     replace("scripts/docs-gate.py", r'RECIPE = re.compile(r"fedora/|packaging\.conf$|', 'RECIPE = re.compile(r"fedora/|'),
+     r"FAIL  packaging\.conf alone"),
+    ("docs-gate: a reason of one word accepted", replace("scripts/docs-gate.py", "MIN_WORDS = 3", "MIN_WORDS = 0"),
+     r"FAIL  a reason too short"),
+    ("changelog-check: a recipe that is gone, still shipped",
+     replace("scripts/changelog-check.py", "    for pkg, distro in state - have:\n", "    for pkg, distro in set():\n"),
+     r"FAIL  a recipe that is gone while the log ships it"),
+    ("texts-check: a live drift ignored", replace("scripts/texts-check.py", "        if want != have:\n", "        if False:\n"),
+     r"FAIL  live: a description edited on COPR"),
+    ("texts-check: an unknown chroot accepted",
+     replace("scripts/texts-check.py", "            unknown.append(c)\n", "            pass\n"),
+     r"FAIL  live: an unknown chroot is a finding"),
     # the reconciler's decisions, broken one at a time
     ("reconcile: no grace period", replace(REC, "GRACE = 3600", "GRACE = 0"), r"FAIL  fresh"),
     ("reconcile: a failed build of main's NEVRA ignored", replace(REC, "    if tried:\n", "    if False and tried:\n"),
@@ -305,6 +337,26 @@ def run_special(w, verdict):
     verdict(p.returncode != 0 and git(w, "rev-parse", "HEAD").stdout == before,
             "hook: a commit with a lint finding is refused", tail(p.stdout))
     reset(w)
+
+    # The commit-msg hook: a recipe change comes with a text change or a reason.
+    # The spec edit passes lint, so only docs-gate.py can refuse it.
+    for label, msg, want_made in (
+        ("hook: a spec change without a text or a reason is refused", "tea: a comment\n", False),
+        ("hook: ... and with a Docs-unchanged reason it is made",
+         "tea: a comment\n\nDocs-unchanged: a spec comment, nothing a reader sees\n", True),
+    ):
+        try:
+            replace("fedora/tea/tea.spec", "\nName:", "\n# selftest\nName:")(w)
+        except DoesNotApply as e:
+            verdict(False, label, f"the defect does not apply any more ({e})")
+            continue
+        before = git(w, "rev-parse", "HEAD").stdout.strip()
+        p = git(w, "commit", "-q", "-a", "-m", msg, check=False)
+        made = git(w, "rev-parse", "HEAD").stdout.strip() != before
+        why = made or "docs-gate: this commit changes fedora/tea/tea.spec" in p.stdout
+        verdict(made == want_made and why, label, f"commit {'made' if made else 'refused'}:\n" + tail(p.stdout))
+        git(w, "reset", "-q", "--hard", before)
+        reset(w)
 
     # `git commit -a` hands the hook an absolute GIT_INDEX_FILE. The suites run
     # git in throwaway repositories; if they inherited it, their files would be

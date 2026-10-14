@@ -1,0 +1,1 @@
+RPM/COPR packaging recipes for public CLI/infra tools (COPR gmipf/devtools), kept current via Packit.

@@ -1,7 +1,8 @@
 # Creating the Copr project `gmipf/devtools`
 
 One-time setup of the public Copr project this repo publishes to. Public tools only —
-no private/closed-source artifacts ever land in a public Copr (see `CLAUDE.md`).
+no private/closed-source artifacts ever land in a public Copr. Back to
+[how-it-works.md](how-it-works.md).
 
 `copr-cli` is already installed and `~/.config/copr` exists locally, so the CLI path
 below is the fast one. The web UI path is given as an equivalent fallback.
@@ -71,8 +72,8 @@ Client.create_from_config_file().project_proxy.edit(
 )
 ```
 
-Mirror the layout of the sibling project `gmipf/media-preservation` (Install → Tools →
-Updates → Upstream → Packaging recipes, with a hobby/unsupported disclaimer).
+The texts themselves live word for word in [descriptions/](descriptions/README.md),
+which also shows how to publish them and how CI compares them with the live ones.
 
 ---
 

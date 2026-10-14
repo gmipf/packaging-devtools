@@ -4,7 +4,9 @@ name: check-repo
 # installed: a tool that is missing here fails the run, because not measured
 # is not clean. The pre-commit hook (.githooks) runs the same script but skips
 # what a machine does not have -- this job is what holds for every clone.
-# Next to it, every spec is built with its %check (scripts/rpmbuild-check.sh).
+# Next to it, every spec is built with its %check (scripts/rpmbuild-check.sh),
+# every pushed commit passes the docs gate, and the live descriptions are
+# compared with their copies in git.
 #
 # The daily run is not decoration: the watchers commit with the built-in
 # GITHUB_TOKEN, and pushes made with it start no other workflow. Without the
@@ -57,6 +59,46 @@ jobs:
       # can no longer turn red fails here instead of passing everything.
       - name: scripts/selftest.py
         run: python3 scripts/selftest.py
+
+  # Every pushed commit that changes a recipe, packaging.conf, .packit.yaml or
+  # a workflow also changes a text, or names why not in a `Docs-unchanged:`
+  # trailer (scripts/docs-gate.py; the commit-msg hook checks the same before
+  # the commit). Only on push and pull requests: the daily run has no pushed
+  # commits to read, and would otherwise judge whatever happens to be the last
+  # commit. Watcher commits never reach this job: they push with GITHUB_TOKEN,
+  # which starts no workflow, so `before` is always the tip they left.
+  docs-gate:
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: docs gate over the pushed commits
+        env:
+          RANGE: >-
+            ${{ github.event_name == 'pull_request'
+                && format('{0}..{1}', github.event.pull_request.base.sha, github.event.pull_request.head.sha)
+                || format('{0}..{1}', github.event.before, github.sha) }}
+        run: python3 scripts/docs-gate.py --range "$RANGE"
+
+  # The GitHub About and the COPR texts against their copies in
+  # docs/descriptions/, and every Fedora release and architecture COPR builds
+  # for against CHANGELOG.md (scripts/texts-check.py live). Public reads; the
+  # token only lifts GitHub's rate limit. Red on a drift either way: a text
+  # changed here and not published, or one edited on a service and not taken
+  # into git. Daily too, so a new Fedora release on COPR is noticed.
+  live-texts:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: live descriptions and releases against the texts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/texts-check.py live
 
   # A push to main builds nothing on COPR, so a spec edited there would first
   # be built when the next upstream release bumps it -- and that release would

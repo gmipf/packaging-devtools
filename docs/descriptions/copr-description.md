@@ -1,0 +1,1 @@
+Public CLI and infrastructure tools packaged as RPMs for Fedora 43+ (x86_64), built and delivered through Packit + Copr so `dnf upgrade` tracks new upstream versions. Currently ships: tea (the official Gitea/Forgejo command-line client) and Anchore's software supply-chain trio — syft (SBOM generator), grype (vulnerability scanner) and grant (license checker).

@@ -27,7 +27,14 @@
 #                checked both ways
 #   tests        scripts/test-*.py: reconciler decisions, .packit.yaml rules,
 #                every package through a simulated upstream bump, every
-#                watcher against a fake upstream, proofs/ledger.tsv still true
+#                watcher against a fake upstream, proofs/ledger.tsv still true,
+#                and the decisions of the three text checks below
+#   CHANGELOG.md every recipe has a line that added it, and nothing the log
+#                still ships has lost its recipe (changelog-check.py)
+#   texts        every package named in the README, docs/how-it-works.md and
+#                the COPR texts, every workflow in docs/how-it-works.md
+#                (texts-check.py offline; the live half runs in check-repo.yml,
+#                the per-commit half is the commit-msg hook, docs-gate.py)
 #   coverage     a tracked file type no rule here understands (XML, .desktop,
 #                manpage) is red until a rule for it exists
 set -uo pipefail
@@ -178,6 +185,22 @@ if have python3; then
             else bad "$t:"; grep -v '^PASS' <<<"$out" >&2; fi
         done
     fi
+fi
+
+# --- CHANGELOG.md -----------------------------------------------------------
+# The log says which package reached Fedora when. No watcher adds or drops a
+# package; a person does, and the log is the step a person forgets.
+if have python3; then
+    if out=$(python3 -B scripts/changelog-check.py 2>&1); then ok "$out"
+    else bad "CHANGELOG.md:"; printf '%s\n' "$out" >&2; fi
+fi
+
+# --- the texts a reader sees ------------------------------------------------
+# A new package reaches the recipes; the README, how-it-works and the COPR
+# texts only if someone remembers. This asks instead.
+if have python3; then
+    if out=$(python3 -B scripts/texts-check.py offline 2>&1); then ok "$out"
+    else bad "texts:"; printf '%s\n' "$out" >&2; fi
 fi
 
 # --- coverage ---------------------------------------------------------------
