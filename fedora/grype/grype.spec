@@ -5,7 +5,7 @@
 %global debug_package %{nil}
 
 Name:           grype
-Version:        0.121.2
+Version:        0.121.3
 Release:        1%{?dist}
 Summary:        Vulnerability scanner for container images, filesystems and SBOMs
 
@@ -101,6 +101,9 @@ done
 %{_datadir}/fish/vendor_completions.d/%{name}.fish
 
 %changelog
+* Tue Nov 10 2026 gmipf <gmipf64@gmail.com> - 0.121.3-1
+- Automated sync to upstream grype release v0.121.3; re-vendored linux_amd64 tarball (SHA256-verified), Release reset to 1.
+
 * Fri Nov 06 2026 gmipf <gmipf64@gmail.com> - 0.121.2-1
 - Automated sync to upstream grype release v0.121.2; re-vendored linux_amd64 tarball (SHA256-verified), Release reset to 1.
 
