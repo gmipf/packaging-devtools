@@ -5,7 +5,7 @@
 %global debug_package %{nil}
 
 Name:           grant
-Version:        0.7.1
+Version:        0.8.0
 Release:        1%{?dist}
 Summary:        Check container image, SBOM and filesystem licenses against a policy
 
@@ -107,6 +107,9 @@ done
 %{_datadir}/fish/vendor_completions.d/%{name}.fish
 
 %changelog
+* Tue Nov 17 2026 gmipf <gmipf64@gmail.com> - 0.8.0-1
+- Automated sync to upstream grant release v0.8.0; re-vendored linux_amd64 tarball (SHA256-verified), Release reset to 1.
+
 * Mon Nov 09 2026 gmipf <gmipf64@gmail.com> - 0.7.1-1
 - Automated sync to upstream grant release v0.7.1; re-vendored linux_amd64 tarball (SHA256-verified), Release reset to 1.
 
