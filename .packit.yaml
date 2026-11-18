@@ -84,6 +84,21 @@ packages:
         - bash -c "rpmspec -q --queryformat '%{version}\n' actionlint.spec | head -1"
       create-archive:
         - bash -c "ls -1 actionlint_*_linux_amd64.tar.gz | head -1"
+  gitea-cli:
+    paths:
+      - fedora/gitea-cli/
+    specfile_path: gitea-cli.spec
+    upstream_project_url: https://gitea.com/gitea/cli
+    # Same vendored-binary model as tea: the verbatim upstream linux-amd64 .xz
+    # and the LICENSE are committed flat in fedora/gitea-cli/, so create-archive
+    # only points Packit at the present binary -- NOTHING is fetched, COPR's
+    # source build stays hermetic (enable_net=off). The upstream-release watcher
+    # refreshes the vendored binary on bumps.
+    actions:
+      get-current-version:
+        - bash -c "rpmspec -q --queryformat '%{version}\n' gitea-cli.spec | head -1"
+      create-archive:
+        - bash -c "ls -1 gitea-cli-*-linux-amd64.xz | head -1"
 
 jobs:
   # Branch-scoped commit job: only a push to build-tea fires this build (a push
@@ -130,6 +145,15 @@ jobs:
     trigger: commit
     branch: ^build-actionlint$
     packages: [actionlint]
+    update_release: false
+    owner: gmipf
+    project: devtools
+    targets:
+      - fedora-all-x86_64
+  - job: copr_build
+    trigger: commit
+    branch: ^build-gitea-cli$
+    packages: [gitea-cli]
     update_release: false
     owner: gmipf
     project: devtools

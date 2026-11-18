@@ -493,6 +493,12 @@ def run_rpmbuild(w, verdict):
         "actionlint": (replace("fedora/actionlint/actionlint.spec",
                                "install -D -p -m0644 man/%{name}.1 ", "install -D -p -m0644 /dev/null "),
                        r"Bad exit status from .*\(%check\)"),
+        # a completion installed under the package's name: the shells look it up by
+        # the command's, gt
+        "gitea-cli": (replace("fedora/gitea-cli/gitea-cli.spec",
+                              "%{cmd}.bash %{buildroot}%{_datadir}/bash-completion/completions/%{cmd}\n",
+                              "%{cmd}.bash %{buildroot}%{_datadir}/bash-completion/completions/%{name}\n"),
+                      r"Bad exit status from .*\(%check\)"),
     }
     for tool, (plant, _) in plants.items():
         before = (w / f"fedora/{tool}/{tool}.spec").read_text()

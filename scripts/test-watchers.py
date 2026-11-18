@@ -46,6 +46,7 @@ UPSTREAM = {
     "grant": ("github", "anchore/grant"),
     "actionlint": ("github", "rhysd/actionlint"),
     "tea": ("gitea", "gitea/tea"),
+    "gitea-cli": ("gitea", "gitea/cli"),
 }
 
 CURL = r"""#!/bin/bash

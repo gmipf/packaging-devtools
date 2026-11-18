@@ -2,15 +2,24 @@
 
 ```sh
 sudo dnf copr enable gmipf/devtools
-sudo dnf install tea syft grype grant actionlint
+sudo dnf install gitea-cli tea syft grype grant actionlint
 ```
 
 ## Tools
 
-- **tea** — the official command-line client for [Gitea](https://gitea.com) and
+- **gitea-cli** — the official command-line client for [Gitea](https://gitea.com);
+  its command is `gt`. It manages repositories, issues, pull requests, releases,
+  labels, milestones and Actions secrets and variables, on gitea.com or a
+  self-hosted instance, and gives scripts stable JSON output. It is the successor
+  of tea. Start with `gt auth login`, then `gt --help`. Fedora's unrelated package
+  `gt` (a MIDI player) has a command of the same name, so the two cannot be
+  installed together.
+- **tea** — the command-line client for [Gitea](https://gitea.com) and
   [Forgejo](https://forgejo.org): manage repositories, issues, pull requests,
   releases and labels from the terminal, including against self-hosted instances.
-  Start with `tea --help`, then add a login with `tea login add`.
+  Start with `tea --help`, then add a login with `tea login add`. Upstream
+  archived tea on 2026-10-29 in favour of gitea-cli; this package stays at its
+  last release.
 - **syft** — [Anchore](https://github.com/anchore/syft)'s tool for generating a
   Software Bill of Materials (SBOM) from container images and filesystems, in SPDX,
   CycloneDX or its native format. Start with `syft --help`, e.g. `syft scan alpine:latest`.
@@ -34,6 +43,7 @@ Copr, so every build is a clean, versioned RPM (no `:latest` drift) and
 
 ## Upstream
 
+- gitea-cli — https://gitea.com/gitea/cli
 - tea — https://gitea.com/gitea/tea
 - syft — https://github.com/anchore/syft
 - grype — https://github.com/anchore/grype

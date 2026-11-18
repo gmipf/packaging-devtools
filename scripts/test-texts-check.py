@@ -81,7 +81,7 @@ check("forms not understood", t.targets(["epel-10-x86_64", "opensuse-leap-16.0-x
 f, _ = t.offline()
 check("the real tree: every package and workflow named", f, [])
 check("packages come from fedora/ and packaging.conf", sorted(t.packages()),
-      ["actionlint", "grant", "grype", "syft", "tea"])
+      ["actionlint", "gitea-cli", "grant", "grype", "syft", "tea"])
 with_texts({"docs/how-it-works.md": ("grant", "gr_ant")})
 f, _ = t.offline()
 restore()

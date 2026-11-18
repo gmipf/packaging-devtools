@@ -22,6 +22,13 @@ indented. Every other line is free text and is not checked; scripts/texts-check.
 live makes sure every Fedora release and architecture COPR builds for is named.
 -->
 
+## 2026-11-19
+
+- Added `gitea-cli` on Fedora. The official Gitea command-line client, `gt`,
+  successor of tea, which upstream archived on 2026-10-29. Conflicts with
+  Fedora's unrelated package `gt`, a MIDI player with a command of the same
+  name.
+
 ## 2026-11-18
 
 - Added `actionlint` on Fedora. A static checker for GitHub Actions workflow

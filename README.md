@@ -9,7 +9,8 @@ the recipes; the tools come from their upstream projects.
 
 | Tool | What it is |
 |---|---|
-| [tea](https://gitea.com/gitea/tea) | command-line client for Gitea and Forgejo |
+| [gitea-cli](https://gitea.com/gitea/cli) | the official Gitea command-line client, `gt`; successor of tea |
+| [tea](https://gitea.com/gitea/tea) | command-line client for Gitea and Forgejo; archived upstream |
 | [syft](https://github.com/anchore/syft) | SBOM generator (SPDX, CycloneDX) |
 | [grype](https://github.com/anchore/grype) | vulnerability scanner for images, filesystems and SBOMs |
 | [grant](https://github.com/anchore/grant) | license checker for images, SBOMs and filesystems |
@@ -26,7 +27,7 @@ Which package arrived when: [CHANGELOG.md](CHANGELOG.md).
 
 ```sh
 sudo dnf copr enable gmipf/devtools
-sudo dnf install tea syft grype grant actionlint
+sudo dnf install gitea-cli tea syft grype grant actionlint
 ```
 
 ## Status
