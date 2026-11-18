@@ -1,9 +1,8 @@
 # copr-runs-check
 
 Claim, one ledger entry per package (`copr-runs-check-syft`, `-grype`,
-`-grant`, `-actionlint`): Copr runs the `%check` section of that package's
-spec, and its builds pass with it. tea is `copr-runs-check-tea`, still open:
-its last Copr build, 0.16.0-1 on 2026-09-10, predates `%check`.
+`-grant`, `-actionlint`, `-tea`): Copr runs the `%check` section of that
+package's spec, and its builds pass with it.
 
 The red half was measured in CI, not at Copr: `scripts/selftest.py --rpmbuild`
 (check-repo.yml, job `rpmbuild`) plants one packaging fault per spec -- a
@@ -115,3 +114,34 @@ fedora-rawhide-x86_64:
 
 VERDICT: holds for actionlint. Copr ran its `%check` in all four chroots of
 its first build, and it passed.
+
+tea will see no new release to run its `%check`: upstream archived the
+repository on 2026-10-29 and names gt (gitea.com/gitea/cli) as its successor.
+Its last Copr build, 0.16.0-1 on 2026-09-10, predates `%check`, so 8eaf437
+builds the same binary once more as 0.16.0-2, only for that.
+
+OBSERVED for tea (read on 2026-11-18 from `builder-live.log` of all four
+chroots): 11357085, tea 0.16.0-2, succeeded 2026-11-18. In each chroot the
+binary prints 0.16.0, the man page has 3995 lines and the section ends in
+`+ exit 0`. From fedora-rawhide-x86_64:
+
+    Executing(%check): /bin/sh -e /var/tmp/rpm-tmp.cYa69G
+    + umask 022
+    + cd /builddir/build/BUILD/tea-0.16.0-build
+    [the compiler flag exports]
+    + cd packaging-devtools-0.16.0
+    ++ /builddir/build/BUILD/tea-0.16.0-build/BUILDROOT/usr/bin/tea --version
+    + v=$'Version: \E[1m0.16.0\E[0m\tgolang: 1.26.6\tgo-sdk: v1.2.0'
+    + echo $'Version: \E[1m0.16.0\E[0m\tgolang: 1.26.6\tgo-sdk: v1.2.0'
+    + case " $v " in
+    Version: 0.16.0	golang: 1.26.6	go-sdk: v1.2.0
+    + zcat -f /builddir/build/BUILD/tea-0.16.0-build/BUILDROOT/usr/share/man/man1/tea.1.gz
+    + grep -q '^\.TH ' tea.1.check
+    ++ wc -l
+    + test 3995 -gt 20
+    ++ jobs -p
+    + exit 0
+    Processing files: tea-0.16.0-2.fc46.x86_64
+
+VERDICT: holds for tea. Copr ran its `%check` in all four chroots of
+11357085, and it passed.

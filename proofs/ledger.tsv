@@ -20,10 +20,7 @@
 #                       %check showed). Rests on that package's own job and
 #                       packages block only, so another package's job does
 #                       not reopen it. Observed 2026-11-18 for syft, grype,
-#                       grant and actionlint (proofs/copr-runs-check.md)
-# copr-runs-check-tea   open until tea's first Copr build since %check came
-#                       in (456ed51): its last one, 0.16.0-1 on 2026-09-10,
-#                       predates it
+#                       grant, actionlint and tea (proofs/copr-runs-check.md)
 # reconcile-heals-live  copr-reconcile re-pushes a lost trigger on GitHub and
 #                       Copr builds it. Not provoked on purpose: losing a
 #                       trigger for real would leave a release unbuilt.
@@ -33,5 +30,5 @@ copr-runs-check-syft|observed|2026-11-18|8260497c5c9d81d8|proofs/copr-runs-check
 copr-runs-check-grype|observed|2026-11-18|b3b69952852ae67b|proofs/copr-runs-check.md|.packit.yaml#jobs[branch=^build-grype$],.packit.yaml#packages.grype
 copr-runs-check-grant|observed|2026-11-18|fd392b92640eda16|proofs/copr-runs-check.md|.packit.yaml#jobs[branch=^build-grant$],.packit.yaml#packages.grant
 copr-runs-check-actionlint|observed|2026-11-18|f70b33c30ee8587e|proofs/copr-runs-check.md|.packit.yaml#jobs[branch=^build-actionlint$],.packit.yaml#packages.actionlint
-copr-runs-check-tea|not-yet|-|-|-|.packit.yaml#jobs[branch=^build-tea$],.packit.yaml#packages.tea
+copr-runs-check-tea|observed|2026-11-18|6f1ba34339f80efe|proofs/copr-runs-check.md|.packit.yaml#jobs[branch=^build-tea$],.packit.yaml#packages.tea
 reconcile-heals-live|not-yet|-|-|-|scripts/copr-reconcile.py#judge,scripts/copr-reconcile.py#heal,.github/workflows/copr-reconcile.yml
