@@ -1,8 +1,9 @@
 # copr-runs-check
 
-Claim: Copr runs the `%check` section of the syft, grype, grant and
-actionlint specs, and their builds pass with it. tea is the separate entry `copr-runs-check-tea`,
-still open: its last Copr build, 0.16.0-1 on 2026-09-10, predates `%check`.
+Claim, one ledger entry per package (`copr-runs-check-syft`, `-grype`,
+`-grant`, `-actionlint`): Copr runs the `%check` section of that package's
+spec, and its builds pass with it. tea is `copr-runs-check-tea`, still open:
+its last Copr build, 0.16.0-1 on 2026-09-10, predates `%check`.
 
 The red half was measured in CI, not at Copr: `scripts/selftest.py --rpmbuild`
 (check-repo.yml, job `rpmbuild`) plants one packaging fault per spec -- a
@@ -60,18 +61,25 @@ bracketed lines stand for what was left out:
     + exit 0
     Processing files: syft-1.57.2-1.fc46.x86_64
 
-The fingerprint in the ledger was taken on 2026-11-18 over `.packit.yaml`'s
-`jobs`. The file has not changed since 6587f8e (2026-10-03), before every
-build above, and the `%check` sections of all four specs are the same as in
-456ed51.
+Each package's entry rests on that package's own job and packages block in
+`.packit.yaml` (`jobs[branch=^build-<p>$]` and `packages.<p>`), not on the
+whole list of jobs. For syft, grype and grant both are the same at 6587f8e
+(2026-10-03, before every build above), at 82ffd71, where this observation
+was first written down, and at 8da19d8, the last commit before the entry was
+split per package. Only the list around them changed: 0d1f305 appended
+actionlint's job. The `%check` sections of the syft, grype and grant specs
+are the same at 8da19d8 as in 456ed51.
+
+Until that split the observation was one entry over all jobs, and adding
+actionlint's job set it back to not-yet, although no job it was observed for
+had changed. Now a new package's job reopens only `packit-routing`, the claim
+about all jobs together.
 
 VERDICT: holds for syft, grype and grant. Copr ran their `%check` in every
 chroot, and it passed in all 14 builds (56 chroot logs).
 
-Since 0d1f305 (2026-11-18) the claim covers actionlint as well, and its
-ledger entry is open again: the new job changed `.packit.yaml#jobs`. It
-closes once syft, grype, grant and actionlint have each built on Copr with
-the five jobs. What is in so far:
+actionlint came in with 0d1f305 (2026-11-18), with `%check` from its first
+build on.
 
 OBSERVED for actionlint (read on 2026-11-18 from `builder-live.log` of all
 four chroots of its first Copr build): 11351527, actionlint 1.7.12-1,
@@ -104,3 +112,6 @@ fedora-rawhide-x86_64:
     ++ jobs -p
     + exit 0
     Processing files: actionlint-1.7.12-1.fc46.x86_64
+
+VERDICT: holds for actionlint. Copr ran its `%check` in all four chroots of
+its first build, and it passed.

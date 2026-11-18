@@ -141,7 +141,10 @@ def hardcode_version(w):
 FIXTURE = "proofs/selftest-fixture.md"
 
 
-def observed(*plants):
+SYFT_JOB = ".packit.yaml#jobs[branch=^build-syft$]"
+
+
+def observed(*plants, mech=".packit.yaml#jobs"):
     """An observed ledger entry of the copy's own, true for the tree as it is,
     then the defects. The real entries cannot serve: each goes back to not-yet
     whenever its mechanism changes, and a case resting on one would stop
@@ -149,11 +152,42 @@ def observed(*plants):
     def plant(w):
         (w / FIXTURE).write_text("OBSERVED planted by scripts/selftest.py\nVERDICT: a fixture, not a claim\n")
         with open(w / "proofs/ledger.tsv", "a") as f:
-            f.write(f"selftest-fixture|observed|2026-01-01|AUTO|{FIXTURE}|.packit.yaml#jobs\n")
+            f.write(f"selftest-fixture|observed|2026-01-01|AUTO|{FIXTURE}|{mech}\n")
         sh("python3", "scripts/test-proofs.py", "--refresh", cwd=w)
         for p in plants:
             p(w)
     return plant
+
+
+def reopen(claim):
+    """What a person does in the commit that changes an entry's mechanism: set
+    it back to not-yet (a no-op if it is open already)."""
+    def plant(w):
+        f = w / "proofs/ledger.tsv"
+        s = f.read_text()
+        if not re.search(rf"^{re.escape(claim)}\|", s, re.M):
+            raise DoesNotApply(f"proofs/ledger.tsv has no entry {claim!r}")
+        f.write_text(re.sub(rf"^{re.escape(claim)}\|[^|]*\|[^|]*\|[^|]*\|[^|]*\|",
+                            f"{claim}|not-yet|-|-|-|", s, count=1, flags=re.M))
+    return plant
+
+
+def job_tail(pkg):
+    return (f"packages: [{pkg}]\n    update_release: false\n    owner: gmipf\n    project: devtools\n"
+            "    targets:\n      - fedora-all-x86_64\n")
+
+
+def add_aarch64(pkg):
+    return replace(".packit.yaml", job_tail(pkg), job_tail(pkg) + "      - fedora-all-aarch64\n")
+
+
+# syft's job and grype's change places: syft's job is the same, only no longer second.
+SWAP_SYFT_GRYPE = replace(
+    ".packit.yaml",
+    f"branch: ^build-syft$\n    {job_tail('syft')}  - job: copr_build\n    trigger: commit\n"
+    f"    branch: ^build-grype$\n    {job_tail('grype')}",
+    f"branch: ^build-grype$\n    {job_tail('grype')}  - job: copr_build\n    trigger: commit\n"
+    f"    branch: ^build-syft$\n    {job_tail('syft')}")
 
 
 REC = "scripts/copr-reconcile.py"
@@ -225,10 +259,23 @@ LINT = [
              "          bash scripts/push-retry.sh -f origin trigger-tmp:build-syft\n", ""),
      r"FAIL  syft: trigger: build branch is main plus its landing page"),
     # proofs/ledger.tsv: an observation must not outlive its mechanism
-    ("ledger: a job changed, its observation kept",
+    ("ledger: a job changed, an observation of all jobs kept",
      observed(replace(".packit.yaml", "targets:\n      - fedora-all-x86_64\n",
                       "targets:\n      - fedora-all-x86_64\n      - fedora-all-aarch64\n")),
      r"selftest-fixture\n +DRIFT: \.packit\.yaml#jobs"),
+    ("ledger: a package's own job changed, its observation kept",
+     observed(add_aarch64("syft"), mech=SYFT_JOB),
+     r"selftest-fixture\n +DRIFT: \.packit\.yaml#jobs\[branch=\^build-syft\$\] changed"),
+    ("ledger: another package's job changed and the jobs reordered, one package's observation holds",
+     observed(add_aarch64("tea"), SWAP_SYFT_GRYPE,
+              reopen("packit-routing"), reopen("copr-runs-check-tea"), mech=SYFT_JOB),
+     None),
+    ("ledger: the job a selector names is gone",
+     observed(replace(".packit.yaml", "branch: ^build-syft$", "branch: ^build-sbom$"), mech=SYFT_JOB),
+     r"selftest-fixture\n +mechanism file gone or moved: .*: 0 entries of 'jobs' with branch=\^build-syft\$"),
+    ("ledger: the job a selector names is there twice",
+     observed(replace(".packit.yaml", "branch: ^build-grype$", "branch: ^build-syft$"), mech=SYFT_JOB),
+     r"selftest-fixture\n +mechanism file gone or moved: .*: 2 entries of 'jobs' with branch=\^build-syft\$"),
     ("ledger: a comment in .packit.yaml is no mechanism change",
      observed(replace(".packit.yaml", "  # Branch-scoped commit job", "  # Branch-scoped (reworded) commit job")),
      None),
@@ -340,8 +387,17 @@ def run_special(w, verdict):
     if not tool:
         verdict(False, "CI mode: a missing linter fails the run", "actionlint is not installed, cannot measure")
     else:
-        d = os.path.dirname(tool)
-        path = os.pathsep.join(x for x in os.environ["PATH"].split(os.pathsep) if os.path.realpath(x) != os.path.realpath(d))
+        # Installed as a package, actionlint lives in /usr/bin next to bash, git
+        # and python3: dropping its directory from PATH would drop them too. Its
+        # directory is replaced instead, by one that links everything but it.
+        d = os.path.realpath(os.path.dirname(tool))
+        shadow = w.parent / "path-without-actionlint"
+        shadow.mkdir()
+        for e in os.scandir(d):
+            if e.name != "actionlint":
+                os.symlink(e.path, shadow / e.name)
+        path = os.pathsep.join(str(shadow) if os.path.realpath(x) == d else x
+                               for x in os.environ["PATH"].split(os.pathsep))
         if shutil.which("actionlint", path=path):
             verdict(False, "CI mode: a missing linter fails the run", "could not take actionlint off PATH")
         else:

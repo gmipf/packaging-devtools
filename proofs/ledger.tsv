@@ -12,24 +12,26 @@
 # packit-routing        one push of build-<tool> builds exactly that package,
 #                       a push to main builds nothing. Observed 2026-10-07
 #                       and, with the actionlint job, again 2026-11-18
-#                       (proofs/packit-routing.md)
-# copr-runs-check       Copr runs the %check of syft, grype, grant and
-#                       actionlint and the builds pass (CI's rpmbuild-check.sh
-#                       does; that it is the same on Copr is what each
-#                       package's first watcher bump since %check showed).
-#                       Observed 2026-11-18 for the first three
-#                       (proofs/copr-runs-check.md); open again since the
-#                       actionlint job: closes once each of the four has built
-#                       on Copr with the new jobs (actionlint's first build,
-#                       11351527, is in)
-# copr-runs-check-tea   the same for tea. Open until tea's first Copr build
-#                       since %check came in (456ed51): its last one,
-#                       0.16.0-1 on 2026-09-10, predates it
+#                       (proofs/packit-routing.md). Rests on all jobs: it is
+#                       a claim about them together, so a new job reopens it
+# copr-runs-check-<p>   Copr runs the %check of package <p> and the build
+#                       passes (CI's rpmbuild-check.sh does; that it is the
+#                       same on Copr is what each package's builds since
+#                       %check showed). Rests on that package's own job and
+#                       packages block only, so another package's job does
+#                       not reopen it. Observed 2026-11-18 for syft, grype,
+#                       grant and actionlint (proofs/copr-runs-check.md)
+# copr-runs-check-tea   open until tea's first Copr build since %check came
+#                       in (456ed51): its last one, 0.16.0-1 on 2026-09-10,
+#                       predates it
 # reconcile-heals-live  copr-reconcile re-pushes a lost trigger on GitHub and
 #                       Copr builds it. Not provoked on purpose: losing a
 #                       trigger for real would leave a release unbuilt.
 claim|state|date|mech_hash|evidence|mech
 packit-routing|observed|2026-11-18|7994efbc52afa7c9|proofs/packit-routing.md|.packit.yaml#jobs
-copr-runs-check|not-yet|-|-|-|.packit.yaml#jobs
-copr-runs-check-tea|not-yet|-|-|-|.packit.yaml#jobs
+copr-runs-check-syft|observed|2026-11-18|8260497c5c9d81d8|proofs/copr-runs-check.md|.packit.yaml#jobs[branch=^build-syft$],.packit.yaml#packages.syft
+copr-runs-check-grype|observed|2026-11-18|b3b69952852ae67b|proofs/copr-runs-check.md|.packit.yaml#jobs[branch=^build-grype$],.packit.yaml#packages.grype
+copr-runs-check-grant|observed|2026-11-18|fd392b92640eda16|proofs/copr-runs-check.md|.packit.yaml#jobs[branch=^build-grant$],.packit.yaml#packages.grant
+copr-runs-check-actionlint|observed|2026-11-18|f70b33c30ee8587e|proofs/copr-runs-check.md|.packit.yaml#jobs[branch=^build-actionlint$],.packit.yaml#packages.actionlint
+copr-runs-check-tea|not-yet|-|-|-|.packit.yaml#jobs[branch=^build-tea$],.packit.yaml#packages.tea
 reconcile-heals-live|not-yet|-|-|-|scripts/copr-reconcile.py#judge,scripts/copr-reconcile.py#heal,.github/workflows/copr-reconcile.yml

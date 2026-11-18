@@ -23,6 +23,12 @@ as YAML (path#a.b picks a subtree), a Python function as its syntax tree
 without docstring (path#name), so comments and formatting do not count; any
 other file counts byte for byte.
 
+A YAML key may name one entry of its list: path#jobs[branch=^build-syft$]
+is the one job whose branch is ^build-syft$ (none or several: red), wherever
+it stands in the list. So a claim about one package rests on that package's
+job, and adding another package's job leaves it alone. The value cannot
+contain '.', ',', '|' or brackets.
+
     scripts/test-proofs.py            check (lint.sh runs it)
     scripts/test-proofs.py --refresh  fill in mech_hash where it says AUTO --
                                       only right after observing that entry
@@ -63,10 +69,22 @@ def fragment(spec):
         raise Missing(f"{path} does not exist")
     if path.endswith((".yml", ".yaml")):
         node = yaml.safe_load(f.read_text())
-        for key in filter(None, sel.split(".")):
+        for seg in filter(None, sel.split(".")):
+            m = re.fullmatch(r"([^\[\]=]+)(?:\[([^\[\]=]+)=([^\[\]]*)\])?", seg)
+            if not m:
+                raise Missing(f"{spec}: cannot read selector {seg!r}")
+            key, field, value = m.groups()
             if not isinstance(node, dict) or key not in node:
                 raise Missing(f"{spec}: no key {key!r}")
             node = node[key]
+            if field is None:
+                continue
+            if not isinstance(node, list):
+                raise Missing(f"{spec}: {key!r} is not a list")
+            hits = [e for e in node if isinstance(e, dict) and field in e and str(e[field]) == value]
+            if len(hits) != 1:
+                raise Missing(f"{spec}: {len(hits)} entries of {key!r} with {field}={value}, want exactly one")
+            node = hits[0]
         return json.dumps(canonical(node), sort_keys=True)
     if path.endswith(".py") and sel:
         for n in ast.walk(ast.parse(f.read_text())):
