@@ -22,9 +22,21 @@ No other build since 6587f8e (2026-10-03): tea stayed at 10969768 and grant
 at 10702123, and the pushes to main 6587f8e, b424177, 3ec969f and 456ed51
 built nothing.
 
-The fingerprint in the ledger was taken on 2026-10-13. It is the state that
-was observed: the `jobs` of `.packit.yaml` are identical at 97b78e1, 186369f
-and 01a6423, and no commit in between touched the file.
+OBSERVED again (2026-11-18 at Packit and Copr `gmipf/devtools`, read back
+from the Copr API build list the same evening), after 0d1f305 added the fifth
+job, actionlint's, to `.packit.yaml#jobs`:
 
-VERDICT: holds. One push of a trigger branch, one build, of its own package;
-main builds nothing.
+    0d1f305  Add actionlint        pushed to main                     -> no build
+    d690954  trigger: actionlint   build-tool.sh pushed build-actionlint -> 11351527  actionlint 1.7.12-1 succeeded
+
+The list went from 41 builds to 42. grant stayed at 11342387, grype at
+11350662, syft at 11341982 and tea at 10969768. Packit submitted 11351527 at
+19:58:53 UTC, seconds after the trigger push; the push to main, eight minutes
+earlier (its CI run started at 19:50:03 UTC), built nothing.
+
+The fingerprint in the ledger was taken on 2026-11-18, at 0d1f305: the state
+observed in the second run. The first one was taken on 2026-10-13 over the
+four jobs, identical at 97b78e1, 186369f and 01a6423.
+
+VERDICT: holds, with four jobs and with five. One push of a trigger branch,
+one build, of its own package; main builds nothing.

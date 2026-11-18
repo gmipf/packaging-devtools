@@ -1,7 +1,7 @@
 # copr-runs-check
 
-Claim: Copr runs the `%check` section of the syft, grype and grant specs, and
-their builds pass with it. tea is the separate entry `copr-runs-check-tea`,
+Claim: Copr runs the `%check` section of the syft, grype, grant and
+actionlint specs, and their builds pass with it. tea is the separate entry `copr-runs-check-tea`,
 still open: its last Copr build, 0.16.0-1 on 2026-09-10, predates `%check`.
 
 The red half was measured in CI, not at Copr: `scripts/selftest.py --rpmbuild`
@@ -67,3 +67,40 @@ build above, and the `%check` sections of all four specs are the same as in
 
 VERDICT: holds for syft, grype and grant. Copr ran their `%check` in every
 chroot, and it passed in all 14 builds (56 chroot logs).
+
+Since 0d1f305 (2026-11-18) the claim covers actionlint as well, and its
+ledger entry is open again: the new job changed `.packit.yaml#jobs`. It
+closes once syft, grype, grant and actionlint have each built on Copr with
+the five jobs. What is in so far:
+
+OBSERVED for actionlint (read on 2026-11-18 from `builder-live.log` of all
+four chroots of its first Copr build): 11351527, actionlint 1.7.12-1,
+succeeded 2026-11-18. In each chroot the binary prints 1.7.12, the clean
+workflow passes, the broken one is reported for its undefined context, the
+man page has 284 lines and the section ends in `+ exit 0`. From
+fedora-rawhide-x86_64:
+
+    Executing(%check): /bin/sh -e /var/tmp/rpm-tmp.QJphYW
+    + umask 022
+    + cd /builddir/build/BUILD/actionlint-1.7.12-build
+    [the compiler flag exports]
+    + cd packaging-devtools-1.7.12
+    ++ /builddir/build/BUILD/actionlint-1.7.12-build/BUILDROOT/usr/bin/actionlint -version
+    ++ head -1
+    + v=1.7.12
+    1.7.12
+    + echo 1.7.12
+    + '[' 1.7.12 '!=' 1.7.12 ']'
+    [the two printf lines writing good.yml and bad.yml]
+    + /builddir/build/BUILD/actionlint-1.7.12-build/BUILDROOT/usr/bin/actionlint -shellcheck= -pyflakes= good.yml
+    + /builddir/build/BUILD/actionlint-1.7.12-build/BUILDROOT/usr/bin/actionlint -shellcheck= -pyflakes= -oneline bad.yml
+    + cat bad.out
+    bad.yml:6:23: undefined variable "nosuch". available variables are "env", "github", "inputs", "job", "matrix", "needs", "runner", "secrets", "steps", "strategy", "vars" [expression]
+    + grep -q 'undefined variable "nosuch"' bad.out
+    + zcat -f /builddir/build/BUILD/actionlint-1.7.12-build/BUILDROOT/usr/share/man/man1/actionlint.1.gz
+    + grep -q '^\.TH "ACTIONLINT"' actionlint.1.check
+    ++ wc -l
+    + test 284 -gt 20
+    ++ jobs -p
+    + exit 0
+    Processing files: actionlint-1.7.12-1.fc46.x86_64
