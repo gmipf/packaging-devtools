@@ -22,6 +22,11 @@ indented. Every other line is free text and is not checked; scripts/texts-check.
 live makes sure every Fedora release and architecture COPR builds for is named.
 -->
 
+## 2026-11-18
+
+- Added `actionlint` on Fedora. A static checker for GitHub Actions workflow
+  files.
+
 ## 2026-08-27
 
 - First Fedora 45 builds. COPR's `fedora-all` target adds and drops releases

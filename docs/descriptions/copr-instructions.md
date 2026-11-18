@@ -2,7 +2,7 @@
 
 ```sh
 sudo dnf copr enable gmipf/devtools
-sudo dnf install tea syft grype grant
+sudo dnf install tea syft grype grant actionlint
 ```
 
 ## Tools
@@ -20,6 +20,11 @@ sudo dnf install tea syft grype grant
 - **grant** — [Anchore](https://github.com/anchore/grant)'s license checker for
   container images, SBOMs and filesystems, evaluated against a configurable policy.
   Start with `grant --help`, e.g. `grant list alpine:latest` or `grant check ./sbom.json`.
+- **actionlint** — [rhysd](https://github.com/rhysd/actionlint)'s static checker for
+  GitHub Actions workflow files: syntax, the types in `${{ }}` expressions, action inputs,
+  job dependencies, runner labels and cron schedules. It checks `run:` scripts through
+  ShellCheck and pyflakes, which the package recommends. Run `actionlint` without
+  arguments in a repository to check its `.github/workflows/`; see `actionlint --help`.
 
 ## Updates
 
@@ -33,6 +38,7 @@ Copr, so every build is a clean, versioned RPM (no `:latest` drift) and
 - syft — https://github.com/anchore/syft
 - grype — https://github.com/anchore/grype
 - grant — https://github.com/anchore/grant
+- actionlint — https://github.com/rhysd/actionlint
 
 ## Packaging recipes
 

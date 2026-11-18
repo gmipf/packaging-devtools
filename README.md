@@ -13,6 +13,7 @@ the recipes; the tools come from their upstream projects.
 | [syft](https://github.com/anchore/syft) | SBOM generator (SPDX, CycloneDX) |
 | [grype](https://github.com/anchore/grype) | vulnerability scanner for images, filesystems and SBOMs |
 | [grant](https://github.com/anchore/grant) | license checker for images, SBOMs and filesystems |
+| [actionlint](https://github.com/rhysd/actionlint) | static checker for GitHub Actions workflow files |
 
 A watcher per tool checks upstream every day; a new release is packaged and
 built on COPR automatically, and `dnf upgrade` picks it up. What each package
@@ -25,7 +26,7 @@ Which package arrived when: [CHANGELOG.md](CHANGELOG.md).
 
 ```sh
 sudo dnf copr enable gmipf/devtools
-sudo dnf install tea syft grype grant
+sudo dnf install tea syft grype grant actionlint
 ```
 
 ## Status

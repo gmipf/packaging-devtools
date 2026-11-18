@@ -138,6 +138,24 @@ def hardcode_version(w):
     replace(".packit.yaml", gcv("tea"), f"echo {spec_version(w, 'tea')}")(w)
 
 
+FIXTURE = "proofs/selftest-fixture.md"
+
+
+def observed(*plants):
+    """An observed ledger entry of the copy's own, true for the tree as it is,
+    then the defects. The real entries cannot serve: each goes back to not-yet
+    whenever its mechanism changes, and a case resting on one would stop
+    measuring anything until the next observation."""
+    def plant(w):
+        (w / FIXTURE).write_text("OBSERVED planted by scripts/selftest.py\nVERDICT: a fixture, not a claim\n")
+        with open(w / "proofs/ledger.tsv", "a") as f:
+            f.write(f"selftest-fixture|observed|2026-01-01|AUTO|{FIXTURE}|.packit.yaml#jobs\n")
+        sh("python3", "scripts/test-proofs.py", "--refresh", cwd=w)
+        for p in plants:
+            p(w)
+    return plant
+
+
 REC = "scripts/copr-reconcile.py"
 LINT = [
     # lint.sh's own rules
@@ -208,17 +226,20 @@ LINT = [
      r"FAIL  syft: trigger: build branch is main plus its landing page"),
     # proofs/ledger.tsv: an observation must not outlive its mechanism
     ("ledger: a job changed, its observation kept",
-     replace(".packit.yaml", "targets:\n      - fedora-all-x86_64\n",
-             "targets:\n      - fedora-all-x86_64\n      - fedora-all-aarch64\n"), r"DRIFT: \.packit\.yaml#jobs"),
+     observed(replace(".packit.yaml", "targets:\n      - fedora-all-x86_64\n",
+                      "targets:\n      - fedora-all-x86_64\n      - fedora-all-aarch64\n")),
+     r"selftest-fixture\n +DRIFT: \.packit\.yaml#jobs"),
     ("ledger: a comment in .packit.yaml is no mechanism change",
-     replace(".packit.yaml", "  # Branch-scoped commit job", "  # Branch-scoped (reworded) commit job"), None),
-    ("ledger: evidence file missing", remove("proofs/packit-routing.md"),
-     r"evidence proofs/packit-routing\.md does not exist"),
-    ("ledger: evidence without a VERDICT", replace("proofs/packit-routing.md", "\nVERDICT:", "\nVerdict:"),
-     r"has no VERDICT line"),
+     observed(replace(".packit.yaml", "  # Branch-scoped commit job", "  # Branch-scoped (reworded) commit job")),
+     None),
+    ("ledger: evidence file missing", observed(remove(FIXTURE)),
+     r"evidence proofs/selftest-fixture\.md does not exist"),
+    ("ledger: evidence without a VERDICT", observed(replace(FIXTURE, "\nVERDICT:", "\nVerdict:")),
+     r"selftest-fixture\.md has no VERDICT line"),
     ("ledger: a mechanism function renamed", replace(REC, "def heal(", "def heal_trigger("),
      r"mechanism file gone or moved: .*no function or class 'heal'"),
-    ("ledger: unknown state", replace("proofs/ledger.tsv", "packit-routing|observed|", "packit-routing|assumed|"),
+    ("ledger: unknown state",
+     observed(replace("proofs/ledger.tsv", "selftest-fixture|observed|", "selftest-fixture|assumed|")),
      r"unknown state 'assumed'"),
     # the texts: the tree against what a reader sees, and the checks' own decisions
     ("changelog: a package without its Added line",
@@ -412,6 +433,10 @@ def run_rpmbuild(w, verdict):
         "grant": (lambda w: (w / "fedora/grant/grant.spec").write_text(
             re.sub(r"\n%check\n.*?(?=\n%files\n)", "", (w / "fedora/grant/grant.spec").read_text(), count=1, flags=re.S)),
                   r"%check did not run"),
+        # the man page upstream bundles arrives empty
+        "actionlint": (replace("fedora/actionlint/actionlint.spec",
+                               "install -D -p -m0644 man/%{name}.1 ", "install -D -p -m0644 /dev/null "),
+                       r"Bad exit status from .*\(%check\)"),
     }
     for tool, (plant, _) in plants.items():
         before = (w / f"fedora/{tool}/{tool}.spec").read_text()

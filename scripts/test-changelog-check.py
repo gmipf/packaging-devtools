@@ -45,7 +45,7 @@ TREE = c.tree()
 SYFT = "- Added `syft` on Fedora. Anchore's SBOM generator."
 
 # --- the tree as the check sees it ---------------------------------------------
-check("tree: 4 packages on Fedora", TREE, {(p, "Fedora") for p in ("tea", "syft", "grype", "grant")})
+check("tree: 5 packages on Fedora", TREE, {(p, "Fedora") for p in ("tea", "syft", "grype", "grant", "actionlint")})
 
 # --- green ---------------------------------------------------------------------
 check("the real log against the real tree", c.check(LOG, TREE), [])

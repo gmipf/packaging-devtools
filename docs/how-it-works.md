@@ -10,13 +10,16 @@ Back to the [README](../README.md).
 | syft | [anchore/syft](https://github.com/anchore/syft) releases | `watch-syft-releases.yml` | the `linux_amd64` tarball, checked against the release's `checksums.txt` |
 | grype | [anchore/grype](https://github.com/anchore/grype) releases | `watch-grype-releases.yml` | the same way as syft |
 | grant | [anchore/grant](https://github.com/anchore/grant) releases | `watch-grant-releases.yml` | the same way as syft |
+| actionlint | [rhysd/actionlint](https://github.com/rhysd/actionlint) releases | `watch-actionlint-releases.yml` | the same way as syft |
 
 Every package is the upstream binary, repackaged: COPR builds offline, so the
 release asset is committed next to the spec (`fedora/<app>/`) and nothing is
 fetched at build time. The man page (and for syft, grype and grant the shell
-completions) is rendered from the binary during the build. Each spec's `%check`
-runs the binary it ships: it must report exactly the packaged version, and what
-was rendered from it must not be empty.
+completions) is rendered from the binary during the build; actionlint is the
+exception, its release tarball brings a man page of its own. Each spec's
+`%check` runs the binary it ships: it must report exactly the packaged version,
+and its man page and completions must not be empty. actionlint's `%check` also
+lints two small workflows: a clean one must pass, a broken one must be caught.
 
 ## Automation
 

@@ -44,6 +44,7 @@ UPSTREAM = {
     "syft": ("github", "anchore/syft"),
     "grype": ("github", "anchore/grype"),
     "grant": ("github", "anchore/grant"),
+    "actionlint": ("github", "rhysd/actionlint"),
     "tea": ("gitea", "gitea/tea"),
 }
 

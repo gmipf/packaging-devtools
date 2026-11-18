@@ -141,6 +141,7 @@ fi
 #   invalid-url        Source0 is the vendored upstream tarball, committed next
 #                      to the spec, not a URL: COPR builds offline
 EXPECTED="
+actionlint.spec W invalid-url
 grant.spec W invalid-url
 grype.spec W invalid-url
 syft.spec W invalid-url

@@ -9,10 +9,19 @@
 # VERDICT lines; RED and GREEN for proven), set state, date and evidence,
 # mech_hash=AUTO, then scripts/test-proofs.py --refresh.
 #
-# copr-runs-check       Copr runs the %check of syft, grype and grant and the
-#                       builds pass (CI's rpmbuild-check.sh does; that it is
-#                       the same on Copr is what each package's first watcher
-#                       bump since %check showed)
+# packit-routing        one push of build-<tool> builds exactly that package,
+#                       a push to main builds nothing. Observed 2026-10-07
+#                       (proofs/packit-routing.md); open again since the
+#                       actionlint job joined .packit.yaml#jobs on 2026-11-18,
+#                       until actionlint's first trigger push is read back
+# copr-runs-check       Copr runs the %check of syft, grype, grant and
+#                       actionlint and the builds pass (CI's rpmbuild-check.sh
+#                       does; that it is the same on Copr is what each
+#                       package's first watcher bump since %check showed).
+#                       Observed 2026-11-18 for the first three
+#                       (proofs/copr-runs-check.md); open again since the
+#                       actionlint job: closes once each of the four has built
+#                       on Copr with the new jobs
 # copr-runs-check-tea   the same for tea. Open until tea's first Copr build
 #                       since %check came in (456ed51): its last one,
 #                       0.16.0-1 on 2026-09-10, predates it
@@ -20,7 +29,7 @@
 #                       Copr builds it. Not provoked on purpose: losing a
 #                       trigger for real would leave a release unbuilt.
 claim|state|date|mech_hash|evidence|mech
-packit-routing|observed|2026-10-07|38a05ed7cd559a43|proofs/packit-routing.md|.packit.yaml#jobs
-copr-runs-check|observed|2026-11-18|38a05ed7cd559a43|proofs/copr-runs-check.md|.packit.yaml#jobs
+packit-routing|not-yet|-|-|-|.packit.yaml#jobs
+copr-runs-check|not-yet|-|-|-|.packit.yaml#jobs
 copr-runs-check-tea|not-yet|-|-|-|.packit.yaml#jobs
 reconcile-heals-live|not-yet|-|-|-|scripts/copr-reconcile.py#judge,scripts/copr-reconcile.py#heal,.github/workflows/copr-reconcile.yml
