@@ -1,8 +1,8 @@
 # copr-runs-check
 
 Claim, one ledger entry per package (`copr-runs-check-syft`, `-grype`,
-`-grant`, `-actionlint`, `-tea`): Copr runs the `%check` section of that
-package's spec, and its builds pass with it.
+`-grant`, `-actionlint`, `-tea`, `-gitea-cli`): Copr runs the `%check`
+section of that package's spec, and its builds pass with it.
 
 The red half was measured in CI, not at Copr: `scripts/selftest.py --rpmbuild`
 (check-repo.yml, job `rpmbuild`) plants one packaging fault per spec -- a
@@ -145,3 +145,40 @@ binary prints 0.16.0, the man page has 3995 lines and the section ends in
 
 VERDICT: holds for tea. Copr ran its `%check` in all four chroots of
 11357085, and it passed.
+
+gitea-cli came in with b272966 (2026-11-18), with `%check` from its first
+build on.
+
+OBSERVED for gitea-cli (read on 2026-11-18 from `builder-live.log` of all
+four chroots of its first Copr build): 11357213, gitea-cli 2.0.0-1,
+succeeded 2026-11-18. In each chroot the binary, gt, prints 2.0.0, the man
+page has 35334 lines, the bash, zsh and fish completions each register
+themselves for gt, and the section ends in `+ exit 0`. From
+fedora-rawhide-x86_64:
+
+    Executing(%check): /bin/sh -e /var/tmp/rpm-tmp.3niYNe
+    + umask 022
+    + cd /builddir/build/BUILD/gitea-cli-2.0.0-build
+    [the compiler flag exports]
+    + cd packaging-devtools-2.0.0
+    ++ /builddir/build/BUILD/gitea-cli-2.0.0-build/BUILDROOT/usr/bin/gt --version
+    + v=$'gt version 2.0.0 (2026-11-18)\nhttps://gitea.com/gitea/cli/releases/tag/v2.0.0\nbuilt with go1.27.4'
+    gt version 2.0.0 (2026-11-18)
+    https://gitea.com/gitea/cli/releases/tag/v2.0.0
+    built with go1.27.4
+    + echo $'gt version 2.0.0 (2026-11-18)\nhttps://gitea.com/gitea/cli/releases/tag/v2.0.0\nbuilt with go1.27.4'
+    + case " $v " in
+    + zcat -f /builddir/build/BUILD/gitea-cli-2.0.0-build/BUILDROOT/usr/share/man/man1/gt.1.gz
+    + grep -q '^\.TH ' gt.1.check
+    ++ wc -l
+    + test 35334 -gt 20
+    + grep -q -- '-F __start_gt gt$' /builddir/build/BUILD/gitea-cli-2.0.0-build/BUILDROOT/usr/share/bash-completion/completions/gt
+    + grep -qx '#compdef gt' /builddir/build/BUILD/gitea-cli-2.0.0-build/BUILDROOT/usr/share/zsh/site-functions/_gt
+    + grep -q '^complete -c gt ' /builddir/build/BUILD/gitea-cli-2.0.0-build/BUILDROOT/usr/share/fish/vendor_completions.d/gt.fish
+    + RPM_EC=0
+    ++ jobs -p
+    + exit 0
+    Processing files: gitea-cli-2.0.0-1.fc46.x86_64
+
+VERDICT: holds for gitea-cli. Copr ran its `%check` in all four chroots of
+its first build, and it passed.

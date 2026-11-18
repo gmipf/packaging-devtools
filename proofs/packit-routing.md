@@ -34,9 +34,28 @@ The list went from 41 builds to 42. grant stayed at 11342387, grype at
 19:58:53 UTC, seconds after the trigger push; the push to main, eight minutes
 earlier (its CI run started at 19:50:03 UTC), built nothing.
 
-The fingerprint in the ledger was taken on 2026-11-18, at 0d1f305: the state
-observed in the second run. The first one was taken on 2026-10-13 over the
-four jobs, identical at 97b78e1, 186369f and 01a6423.
+OBSERVED a third time (2026-11-18 at Packit and Copr `gmipf/devtools`, read
+back from the Copr API build list and from the commits' GitHub check runs the
+same night), after b272966 added the sixth job, gitea-cli's:
 
-VERDICT: holds, with four jobs and with five. One push of a trigger branch,
-one build, of its own package; main builds nothing.
+    b272966  Add gitea-cli         pushed to main                       -> no build
+    9c08832  trigger: gitea-cli    build-tool.sh pushed build-gitea-cli -> 11357213  gitea-cli 2.0.0-1 succeeded
+
+build-tool.sh pushed main and then the trigger branch seconds apart, and
+Packit submitted 11357213 at 23:25:18 UTC, so the time alone does not tell
+which push it answered. Its check runs do: the four
+`rpm-build:build-gitea-cli:<chroot>:gitea-cli` runs of packit-as-a-service
+are on 9c08832, and b272966 carries only the four GitHub Actions jobs of
+check-repo. The list went from 43 builds to 44. The 43rd, 11357085, is tea's
+rebuild from its own trigger push, c45d71f on build-tea; the pushes to main
+around it, 8eaf437 and 8ae8f21, built nothing and carry no Packit run either.
+actionlint stayed at 11351527, grant at 11342387, grype at 11350662, syft at
+11341982 and tea at 11357085.
+
+The fingerprint in the ledger is taken at b272966: the six jobs observed in
+the third run. The one before was taken on 2026-11-18 at 0d1f305, over the
+five jobs of the second run; the first on 2026-10-13, over four jobs,
+identical at 97b78e1, 186369f and 01a6423.
+
+VERDICT: holds, with four jobs, with five and with six. One push of a trigger
+branch, one build, of its own package; main builds nothing.

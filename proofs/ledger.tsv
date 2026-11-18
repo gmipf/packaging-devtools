@@ -11,28 +11,27 @@
 #
 # packit-routing        one push of build-<tool> builds exactly that package,
 #                       a push to main builds nothing. Observed 2026-10-07
-#                       and, with the actionlint job, again 2026-11-18
-#                       (proofs/packit-routing.md). Rests on all jobs: it is
-#                       a claim about them together, so a new job reopens it.
-#                       Open again since the gitea-cli job joined, until
-#                       gitea-cli's first trigger push is read back
+#                       and again 2026-11-18, with the actionlint job and
+#                       then with the gitea-cli job (proofs/packit-routing.md).
+#                       Rests on all jobs: it is a claim about them together,
+#                       so a new job reopens it
 # copr-runs-check-<p>   Copr runs the %check of package <p> and the build
 #                       passes (CI's rpmbuild-check.sh does; that it is the
 #                       same on Copr is what each package's builds since
 #                       %check showed). Rests on that package's own job and
 #                       packages block only, so another package's job does
 #                       not reopen it. Observed 2026-11-18 for syft, grype,
-#                       grant, actionlint and tea (proofs/copr-runs-check.md);
-#                       gitea-cli's closes with its first Copr build
+#                       grant, actionlint, tea and gitea-cli
+#                       (proofs/copr-runs-check.md)
 # reconcile-heals-live  copr-reconcile re-pushes a lost trigger on GitHub and
 #                       Copr builds it. Not provoked on purpose: losing a
 #                       trigger for real would leave a release unbuilt.
 claim|state|date|mech_hash|evidence|mech
-packit-routing|not-yet|-|-|-|.packit.yaml#jobs
+packit-routing|observed|2026-11-18|79aff59d64d9177c|proofs/packit-routing.md|.packit.yaml#jobs
 copr-runs-check-syft|observed|2026-11-18|8260497c5c9d81d8|proofs/copr-runs-check.md|.packit.yaml#jobs[branch=^build-syft$],.packit.yaml#packages.syft
 copr-runs-check-grype|observed|2026-11-18|b3b69952852ae67b|proofs/copr-runs-check.md|.packit.yaml#jobs[branch=^build-grype$],.packit.yaml#packages.grype
 copr-runs-check-grant|observed|2026-11-18|fd392b92640eda16|proofs/copr-runs-check.md|.packit.yaml#jobs[branch=^build-grant$],.packit.yaml#packages.grant
 copr-runs-check-actionlint|observed|2026-11-18|f70b33c30ee8587e|proofs/copr-runs-check.md|.packit.yaml#jobs[branch=^build-actionlint$],.packit.yaml#packages.actionlint
 copr-runs-check-tea|observed|2026-11-18|6f1ba34339f80efe|proofs/copr-runs-check.md|.packit.yaml#jobs[branch=^build-tea$],.packit.yaml#packages.tea
-copr-runs-check-gitea-cli|not-yet|-|-|-|.packit.yaml#jobs[branch=^build-gitea-cli$],.packit.yaml#packages.gitea-cli
+copr-runs-check-gitea-cli|observed|2026-11-18|2d7412dbc892b40c|proofs/copr-runs-check.md|.packit.yaml#jobs[branch=^build-gitea-cli$],.packit.yaml#packages.gitea-cli
 reconcile-heals-live|not-yet|-|-|-|scripts/copr-reconcile.py#judge,scripts/copr-reconcile.py#heal,.github/workflows/copr-reconcile.yml
