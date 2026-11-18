@@ -5,7 +5,7 @@
 
 Name:           tea
 Version:        0.16.0
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Command-line tool to interact with Gitea and Forgejo
 
 License:        MIT
@@ -74,6 +74,11 @@ test "$(wc -l < %{name}.1.check)" -gt 20
 %{_mandir}/man1/%{name}.1*
 
 %changelog
+* Wed Nov 18 2026 gmipf <gmipf64@gmail.com> - 0.16.0-2
+- Rebuild of the same binary, so that the %%check section added on
+  2026-10-13 runs on Copr once (upstream archived tea on 2026-10-29,
+  so no new release will do it)
+
 * Thu Sep 10 2026 gmipf <gmipf64@gmail.com> - 0.16.0-1
 - Automated sync to upstream tea release v0.16.0; re-vendored linux-amd64 binary, Release reset to 1.
 
