@@ -27,8 +27,8 @@ gitea-cli's command is `gt`, so its man page and completions are named after
 `gt`, and its `%check` requires each completion to register for `gt`. Fedora
 has an unrelated package `gt` (a MIDI player) with a command of the same name;
 the spec declares the conflict. Upstream archived tea on 2026-10-29 in favour
-of gitea-cli; the tea package stays as it is, and its watcher will not see a
-new release.
+of gitea-cli; the tea package stays at its last release, and
+`fedora/tea/.upstream-archived` says so (see the watchers below).
 
 ## Automation
 
@@ -36,6 +36,13 @@ new release.
   release they download the asset, verify its checksum and that it is an ELF
   binary, set the spec to the new version with `Release: 1`, push that to
   `main`, and then force-push the trigger branch `build-<app>`.
+  Each run first asks the upstream repository whether it is archived
+  (`scripts/upstream-archived.sh`): an archived project never releases again,
+  and its watcher would otherwise stay green for ever. An archived upstream
+  turns the run red until the package is retired, replaced, or kept on purpose
+  with `fedora/<app>/.upstream-archived` (since when and why). That file
+  without an archived upstream is red as well, and so is an answer that says
+  neither.
 - **Packit** builds one package per trigger branch: every `copr_build` job in
   `.packit.yaml` listens on exactly one `build-<app>` branch, so a push to `main`
   builds nothing and a release of one tool rebuilds no other. All jobs set

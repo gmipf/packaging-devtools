@@ -45,6 +45,9 @@ jobs:
           SPEC=$DIR/actionlint.spec
           MARKER=$DIR/.upstream-tag
 
+          # An archived upstream never releases again; ask that first.
+          bash scripts/upstream-archived.sh github rhysd/actionlint "$DIR"
+
           UPSTREAM_TAG=$(gh release view --repo rhysd/actionlint --json tagName -q .tagName)
           if [ -z "$UPSTREAM_TAG" ] || [ "$UPSTREAM_TAG" = "null" ]; then
             echo "::error::Could not read latest actionlint release tag from GitHub"

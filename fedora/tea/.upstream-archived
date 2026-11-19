@@ -1,0 +1,7 @@
+gitea/tea was archived upstream on 2026-10-29 ("tea is replaced by gt").
+The package stays at its last release, 0.16.0; its successor is packaged
+here as gitea-cli.
+
+While this file exists, scripts/upstream-archived.sh lets tea's watcher
+accept the archived upstream. Remove it with the package, or when upstream
+becomes active again (the watcher then turns red until it is gone).

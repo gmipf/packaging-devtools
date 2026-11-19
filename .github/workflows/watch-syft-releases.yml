@@ -45,6 +45,9 @@ jobs:
           SPEC=$DIR/syft.spec
           MARKER=$DIR/.upstream-tag
 
+          # An archived upstream never releases again; ask that first.
+          bash scripts/upstream-archived.sh github anchore/syft "$DIR"
+
           UPSTREAM_TAG=$(gh release view --repo anchore/syft --json tagName -q .tagName)
           if [ -z "$UPSTREAM_TAG" ] || [ "$UPSTREAM_TAG" = "null" ]; then
             echo "::error::Could not read latest syft release tag from GitHub"

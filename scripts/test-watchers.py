@@ -14,9 +14,17 @@ A good release must land on main (spec bumped, Release reset, changelog,
 binary swapped, marker moved) and on the trigger branch. A wrong checksum, a
 missing checksum, a payload that is not an ELF, a missing download and an
 unexpected tag must each stop the watcher before anything is pushed.
+
+Each watcher first asks whether the upstream repository is archived
+(scripts/upstream-archived.sh). The fake upstream answers as the real one does
+today: archived exactly where the package carries .upstream-archived. An
+archived upstream without that file, the file without an archived upstream,
+and an answer that says neither must each stop the watcher; an archived
+upstream with the file must not.
 """
 import hashlib
 import io
+import json
 import lzma
 import os
 import pathlib
@@ -56,11 +64,18 @@ while [ $# -gt 0 ]; do
 done
 echo "curl $url" >> "$STUB_ROOT/calls"
 f=$STUB_ROOT/files/${url#*://}
+[ -d "$f" ] && f=$f/.self
 [ -f "$f" ] || { echo "curl: (22) The requested URL returned error: 404 ($url)" >&2; exit 22; }
 if [ -n "$out" ]; then cp "$f" "$out"; else cat "$f"; fi
 """
 GH = r"""#!/bin/bash
 echo "gh $*" >> "$STUB_ROOT/calls"
+if [ "$1" = api ]; then
+    f=$STUB_ROOT/ghapi/$2
+    [ -f "$f" ] || { echo '{"message":"Not Found","status":"404"}'; echo "gh: Not Found (HTTP 404)" >&2; exit 1; }
+    cat "$f"
+    exit 0
+fi
 repo=
 while [ $# -gt 0 ]; do case $1 in --repo) repo=$2; shift 2 ;; *) shift ;; esac; done
 f=$STUB_ROOT/gh/$repo
@@ -98,10 +113,22 @@ def nevr(spec):
               cwd=spec.parent).splitlines()[0]
 
 
-def fake_release(tool, root, *, tag=TAG, payload=ELF, member=None, sums="good", asset=True):
-    """Lay out what the upstream would serve. sums: good | wrong | missing."""
+def fake_release(tool, root, *, tag=TAG, payload=ELF, member=None, sums="good", asset=True, repo=None):
+    """Lay out what the upstream would serve. sums: good | wrong | missing.
+    repo, the repository's own answer: active | archived | no-field | missing;
+    by default archived exactly where the real package has .upstream-archived."""
     kind, project = UPSTREAM[tool]
     files = root / "files"
+    if repo is None:
+        repo = "archived" if (ROOT / f"fedora/{tool}/.upstream-archived").exists() else "active"
+    if repo != "missing":
+        meta = {"full_name": project}
+        if repo != "no-field":
+            meta["archived"] = repo == "archived"
+        where = (root / "ghapi/repos" / project if kind == "github"
+                 else files / f"gitea.com/api/v1/repos/{project}/.self")
+        where.parent.mkdir(parents=True, exist_ok=True)
+        where.write_text(json.dumps(meta) + "\n")
     if kind == "github":
         (root / "gh" / project).parent.mkdir(parents=True, exist_ok=True)
         (root / "gh" / project).write_text(tag + "\n")
@@ -133,16 +160,24 @@ def fake_release(tool, root, *, tag=TAG, payload=ELF, member=None, sums="good", 
     return name, blob
 
 
-def setup(tool, w):
-    """A repository holding just this tool's package dir and push-retry.sh,
-    with the vendored binary swapped for a small stand-in of the same name."""
+def setup(tool, w, marker=None):
+    """A repository holding just this tool's package dir and the scripts its
+    watcher calls, with the vendored binary swapped for a small stand-in of the
+    same name. marker: True or False puts or takes away .upstream-archived,
+    None leaves it as the package has it."""
     src = ROOT / f"fedora/{tool}"
     spec = src / f"{tool}.spec"
     old = source0(spec)
     work, remote = w / "work", w / "remote.git"
     (work / "scripts").mkdir(parents=True)
-    shutil.copy2(ROOT / "scripts/push-retry.sh", work / "scripts/push-retry.sh")
+    for script in ("push-retry.sh", "upstream-archived.sh"):
+        shutil.copy2(ROOT / "scripts" / script, work / "scripts" / script)
     shutil.copytree(src, work / f"fedora/{tool}", ignore=shutil.ignore_patterns(old))
+    note = work / f"fedora/{tool}/.upstream-archived"
+    if marker:
+        note.write_text("archived upstream, kept on purpose\n")
+    elif marker is False:
+        note.unlink(missing_ok=True)
     (work / f"fedora/{tool}" / old).write_bytes(b"the old vendored binary\n")
     # Every spec sits at Release 1 today, where a watcher that forgot to reset
     # it would look exactly like one that did. Start from a later iteration.
@@ -218,8 +253,8 @@ def good_release(tool, w):
     }
 
 
-def refusal(tool, w, label, expect, **release):
-    work, remote, _ = setup(tool, w)
+def refusal(tool, w, label, expect, marker=None, **release):
+    work, remote, _ = setup(tool, w, marker)
     fake_release(tool, w / "up", **release)
     before = refs(remote)
     rc, out = run_watcher(tool, w, work)
@@ -227,12 +262,12 @@ def refusal(tool, w, label, expect, **release):
     return {f"refuses {label}, pushes nothing": (ok, f"exit {rc}, wanted /{expect}/:\n{out[-1200:]}")}
 
 
-def unchanged(tool, w):
-    work, remote, _ = setup(tool, w)
-    fake_release(tool, w / "up", tag=(work / f"fedora/{tool}/.upstream-tag").read_text().strip())
+def unchanged(tool, w, label="same tag again: nothing to do, nothing pushed", marker=None, repo=None):
+    work, remote, _ = setup(tool, w, marker)
+    fake_release(tool, w / "up", tag=(work / f"fedora/{tool}/.upstream-tag").read_text().strip(), repo=repo)
     before = refs(remote)
     rc, out = run_watcher(tool, w, work)
-    return {"same tag again: nothing to do, nothing pushed": (rc == 0 and refs(remote) == before, out[-800:])}
+    return {label: (rc == 0 and refs(remote) == before, out[-800:])}
 
 
 def cases(tool):
@@ -243,6 +278,16 @@ def cases(tool):
     yield lambda t, w: refusal(t, w, "a payload that is not an ELF", r"not an ELF", payload=b"#!/bin/sh\necho hi\n")
     yield lambda t, w: refusal(t, w, "a missing download", r"404", asset=False)
     yield lambda t, w: refusal(t, w, "an unexpected tag", r"Unexpected .*tag", tag="nightly-2026")
+    yield lambda t, w: refusal(t, w, "an archived upstream without .upstream-archived", r"is archived: no new release",
+                               marker=False, repo="archived")
+    yield lambda t, w: unchanged(t, w, "an archived upstream with .upstream-archived carries on, pushes nothing",
+                                 marker=True, repo="archived")
+    yield lambda t, w: refusal(t, w, "an .upstream-archived that upstream contradicts", r"upstream is active again",
+                               marker=True, repo="active")
+    yield lambda t, w: refusal(t, w, "an answer without the archived field", r"is archived \(answer: null\)",
+                               repo="no-field")
+    yield lambda t, w: refusal(t, w, "no answer whether upstream is archived", r"is archived \(answer: unreadable\)",
+                               repo="missing")
     if UPSTREAM[tool][0] == "github":
         yield lambda t, w: refusal(t, w, "an archive without the binary", r"not a valid gzip tarball containing",
                                    member="README")

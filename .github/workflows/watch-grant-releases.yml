@@ -45,6 +45,9 @@ jobs:
           SPEC=$DIR/grant.spec
           MARKER=$DIR/.upstream-tag
 
+          # An archived upstream never releases again; ask that first.
+          bash scripts/upstream-archived.sh github anchore/grant "$DIR"
+
           UPSTREAM_TAG=$(gh release view --repo anchore/grant --json tagName -q .tagName)
           if [ -z "$UPSTREAM_TAG" ] || [ "$UPSTREAM_TAG" = "null" ]; then
             echo "::error::Could not read latest grant release tag from GitHub"

@@ -45,6 +45,9 @@ jobs:
           SPEC=$DIR/grype.spec
           MARKER=$DIR/.upstream-tag
 
+          # An archived upstream never releases again; ask that first.
+          bash scripts/upstream-archived.sh github anchore/grype "$DIR"
+
           UPSTREAM_TAG=$(gh release view --repo anchore/grype --json tagName -q .tagName)
           if [ -z "$UPSTREAM_TAG" ] || [ "$UPSTREAM_TAG" = "null" ]; then
             echo "::error::Could not read latest grype release tag from GitHub"

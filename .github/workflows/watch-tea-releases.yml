@@ -41,6 +41,9 @@ jobs:
           MARKER=$DIR/.upstream-tag
           API=https://gitea.com/api/v1/repos/gitea/tea
 
+          # An archived upstream never releases again; ask that first.
+          bash scripts/upstream-archived.sh gitea gitea/tea "$DIR"
+
           UPSTREAM_TAG=$(curl -fsSL "$API/releases/latest" | jq -r '.tag_name')
           if [ -z "$UPSTREAM_TAG" ] || [ "$UPSTREAM_TAG" = "null" ]; then
             echo "::error::Could not read latest tea release tag from the gitea API"
