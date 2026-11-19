@@ -26,8 +26,18 @@ permissions:
 jobs:
   lint:
     runs-on: ubuntu-latest
+    # A green run takes about ten minutes; a hang ends here, not after six hours.
+    timeout-minutes: 30
     # Fedora, so the tool versions are the ones a Fedora packager has locally.
-    container: registry.fedoraproject.org/fedora:latest
+    # --init: GitHub starts a job container with `tail -f /dev/null` as PID 1,
+    # which never reaps an orphaned process. git 2.56 detaches its automatic
+    # maintenance on every commit, push and fetch: about 230 orphans per pass
+    # of the test suites, and the selftest makes dozens of passes. Unreaped,
+    # they filled the container's process limit and the selftest hung (measured
+    # 2026-11-19). With an init as PID 1 they are reaped.
+    container:
+      image: registry.fedoraproject.org/fedora:latest
+      options: --init
     steps:
       - name: Install the linters
         run: dnf -y -q install git-core tar gzip /usr/bin/shellcheck /usr/bin/ruff /usr/bin/yamllint /usr/bin/packit /usr/bin/rpmlint rpm-build python3-rpm python3-pyyaml jq xz
@@ -105,7 +115,12 @@ jobs:
   # be stuck. This builds every spec now, the way COPR would, %check included.
   rpmbuild:
     runs-on: ubuntu-latest
-    container: registry.fedoraproject.org/fedora:latest
+    # A green run takes about six minutes.
+    timeout-minutes: 30
+    # --init for the same reason as in the lint job: its selftest runs git too.
+    container:
+      image: registry.fedoraproject.org/fedora:latest
+      options: --init
     steps:
       # The image has neither (measured, Fedora 44). git must come before the
       # checkout, which otherwise downloads the files without .git -- and the
