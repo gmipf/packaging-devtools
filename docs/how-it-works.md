@@ -6,7 +6,7 @@ Back to the [README](../README.md).
 
 | Package | Upstream | Watcher | What is vendored |
 |---|---|---|---|
-| tea | [gitea/tea](https://gitea.com/gitea/tea) releases | `watch-tea-releases.yml` | the static `linux-amd64` binary, checked against its `.sha256` |
+| tea | [gitea/tea](https://gitea.com/gitea/tea) releases | `watch-tea-releases.yml` | the static `linux-amd64` binary, checked against the release's `checksums.txt` and that file's OpenPGP signature |
 | syft | [anchore/syft](https://github.com/anchore/syft) releases | `watch-syft-releases.yml` | the `linux_amd64` tarball, checked against the release's `checksums.txt` and that file's Sigstore signature |
 | grype | [anchore/grype](https://github.com/anchore/grype) releases | `watch-grype-releases.yml` | the same way as syft |
 | grant | [anchore/grant](https://github.com/anchore/grant) releases | `watch-grant-releases.yml` | the same way as syft |
@@ -49,6 +49,12 @@ of gitea-cli; the tea package stays at its last release, and
   `sigstore/cosign-installer` pinned to a commit). Only that workflow's
   identity is accepted. They check it on every run: before a new release is
   vendored, and on an unchanged tag against the tarball already vendored.
+  Gitea signs each tea and gitea-cli release's `checksums.txt` with its
+  OpenPGP release key ("Teabot", `7C9E68152594688862D62AF62D9AE806EC1592E2`),
+  and those two watchers check that signature the same way
+  (`scripts/verify-pgp-checksums.sh`). The key comes from keys.openpgp.org
+  by its fingerprint, where Gitea's documentation points; a renewed expiry or
+  a revocation arrives with it.
 - **Packit** builds one package per trigger branch: every `copr_build` job in
   `.packit.yaml` listens on exactly one `build-<app>` branch, so a push to `main`
   builds nothing and a release of one tool rebuilds no other. All jobs set

@@ -30,6 +30,15 @@ for cosign; its fake bundle names the hash it signs, the signer and the OIDC
 issuer. A checksums.txt changed after signing, a missing signature, another
 signer or another issuer must each stop the watcher, and so must a vendored
 tarball that no longer matches what was signed.
+
+Gitea signs each tea and gitea-cli release's checksums.txt with its OpenPGP
+release key (scripts/verify-pgp-checksums.sh), checked the same way on every
+run. Stubs stand in for gpg and gpgv; a fake key names its fingerprint, a fake
+signature the hash it signs and the key that made it, and gpgv answers with the
+status lines the real one prints. A checksums.txt changed after signing, a
+missing signature, a signature by another key or by a revoked key, another key
+served under the release key's fingerprint, no answer from the key server and
+a vendored binary that no longer matches must each stop the watcher.
 """
 import hashlib
 import io
@@ -70,6 +79,11 @@ UPSTREAM = {
 SIGNED = {"syft", "grype", "grant"}
 SIGNER = "https://github.com/{project}/.github/workflows/release.yaml@refs/heads/main"
 ISSUER = "https://token.actions.githubusercontent.com"
+# Who signs each gitea upstream's checksums.txt: Gitea's release key "Teabot
+# <teabot@gitea.io>", as read from the real signatures (2026-11-19).
+PGP = {"tea", "gitea-cli"}
+PGP_KEY = "7C9E68152594688862D62AF62D9AE806EC1592E2"
+OTHER_KEY = "0123456789ABCDEF0123456789ABCDEF01234567"
 LOCAL = object()  # tag=LOCAL: the release the package already ships
 
 CURL = r"""#!/bin/bash
@@ -125,6 +139,50 @@ if [ -n "$iss" ]; then [ "$issuer" = "$iss" ]; elif [ -n "$issre" ]; then [[ $is
     { echo "Error: failed to verify certificate identity: got issuer \"$issuer\"" >&2; exit 1; }
 echo "Verified OK" >&2
 """
+# gpg and gpgv as far as scripts/verify-pgp-checksums.sh uses them. The fake key
+# is one line, "<primary fingerprint> [revoked]"; the fake signature is
+# "<sha256 of the signed file> <primary fingerprint of the key that made it>".
+# gpgv answers with the status lines and exit codes the real one gives
+# (measured with gpgv 2.4.9): GOODSIG + VALIDSIG ending in the primary
+# fingerprint, BADSIG and 1, ERRSIG + NO_PUBKEY and 2. For a revoked key the
+# stub prints REVKEYSIG and exits 0, the worst case (not measured), so that
+# only a check of the status lines refuses it.
+GPG = r"""#!/bin/bash
+echo "gpg $*" >> "$STUB_ROOT/calls"
+for a; do [ "$a" = --dearmor ] && exec cat; done
+echo "gpg stub: only --dearmor" >&2
+exit 2
+"""
+GPGV = r"""#!/bin/bash
+echo "gpgv $*" >> "$STUB_ROOT/calls"
+fd= keyring=
+while [ $# -gt 2 ]; do
+    case $1 in
+        --status-fd) fd=$2; shift 2 ;;
+        --keyring) keyring=$2; shift 2 ;;
+        *) echo "gpgv stub: flag $1 not known here" >&2; exit 2 ;;
+    esac
+done
+[ "$fd" = 1 ] && [ -n "$keyring" ] && [ $# -eq 2 ] || { echo "gpgv stub: want --status-fd 1 --keyring K SIG FILE" >&2; exit 2; }
+read -r key state < "$keyring" || { echo "gpgv: keydb_search failed" >&2; exit 2; }
+read -r signed signer < "$1" || { echo "gpgv: no signature found" >&2; exit 2; }
+echo "[GNUPG:] NEWSIG"
+if [ "$signer" != "$key" ]; then
+    echo "[GNUPG:] ERRSIG ${signer: -16} 1 10 00 1795034985 9 -"
+    echo "[GNUPG:] NO_PUBKEY ${signer: -16}"
+    exit 2
+fi
+if [ "$(sha256sum < "$2" | cut -d' ' -f1)" != "$signed" ]; then
+    echo "[GNUPG:] BADSIG ${key: -16} Teabot <teabot@gitea.io>"
+    exit 1
+fi
+if [ "$state" = revoked ]; then
+    echo "[GNUPG:] REVKEYSIG ${key: -16} Teabot <teabot@gitea.io>"
+else
+    echo "[GNUPG:] GOODSIG ${key: -16} Teabot <teabot@gitea.io>"
+fi
+echo "[GNUPG:] VALIDSIG CC64B1DB67ABBEECAB24B6455FC346329753F4B0 2026-11-18 1795034985 0 4 0 1 10 00 $key"
+"""
 
 
 def sh(*args, cwd, env=None, check=True):
@@ -161,9 +219,12 @@ def fake_release(tool, root, *, tag=TAG, payload=ELF, member=None, sums="good", 
     """Lay out what the upstream would serve. sums: good | wrong | missing.
     repo, the repository's own answer: active | archived | no-field | missing;
     by default archived exactly where the real package has .upstream-archived.
-    sig, the bundle next to checksums.txt (signed upstreams only): good |
+    sig, the bundle next to checksums.txt (Sigstore upstreams): good |
     tampered (checksums.txt changed after signing) | missing | other-signer |
-    other-issuer. vendored: the bytes the package already ships for this
+    other-issuer; or its checksums.txt.sig (OpenPGP upstreams): good |
+    tampered | missing | other-key | revoked | swapped-key (the key server
+    serves another key, which made the signature) | no-key (the key server
+    has none). vendored: the bytes the package already ships for this
     release; checksums.txt lists them instead of the asset."""
     kind, project = UPSTREAM[tool]
     ver = tag[1:] if re.fullmatch(r"v\d+\.\d+\.\d+", tag) else V
@@ -198,15 +259,28 @@ def fake_release(tool, root, *, tag=TAG, payload=ELF, member=None, sums="good", 
         name = f"{tool}-{ver}-linux-amd64.xz"
         blob = lzma.compress(payload, format=lzma.FORMAT_XZ)
         base = files / f"gitea.com/{project}/releases/download/{tag}"
-        sumfile, sumline = base / f"{name}.sha256", f"  {name}\n"
+        sumfile, sumline = base / "checksums.txt", f"  {name}\n"
     base.mkdir(parents=True, exist_ok=True)
     if asset:
         (base / name).write_bytes(blob)
     listed = blob if vendored is None else vendored
     digest = hashlib.sha256(listed if sums == "good" else listed + b"tampered").hexdigest()
     if sums != "missing":
-        other = "0" * 64 + f"  {tool}_{ver}_darwin_amd64.tar.gz\n"
-        sumfile.write_text((other if kind == "github" else "") + digest + sumline)
+        other = "0" * 64 + (f"  {tool}_{ver}_darwin_amd64.tar.gz\n" if kind == "github"
+                            else f"  {tool}-{ver}-darwin-amd64.xz\n")
+        sumfile.write_text(other + digest + sumline)
+    if tool in PGP:
+        signed = sumfile.read_bytes() if sumfile.exists() else b""
+        if sig == "tampered":
+            signed += b"0" * 64 + b"  an asset signed before checksums.txt was changed\n"
+        signer = OTHER_KEY if sig in ("other-key", "swapped-key") else PGP_KEY
+        if sig != "missing":
+            (base / "checksums.txt.sig").write_text(f"{hashlib.sha256(signed).hexdigest()} {signer}\n")
+        if sig != "no-key":
+            served = files / f"keys.openpgp.org/vks/v1/by-fingerprint/{PGP_KEY}"
+            served.parent.mkdir(parents=True, exist_ok=True)
+            served.write_text((OTHER_KEY if sig == "swapped-key" else PGP_KEY)
+                              + (" revoked" if sig == "revoked" else "") + "\n")
     if tool in SIGNED and sig != "missing":
         signed = sumfile.read_bytes() if sumfile.exists() else b""
         signer = SIGNER.format(project=f"someone-else/{tool}" if sig == "other-signer" else project)
@@ -228,7 +302,7 @@ def setup(tool, w, marker=None):
     old = source0(spec)
     work, remote = w / "work", w / "remote.git"
     (work / "scripts").mkdir(parents=True)
-    for script in ("push-retry.sh", "upstream-archived.sh", "verify-signed-checksums.sh"):
+    for script in ("push-retry.sh", "upstream-archived.sh", "verify-signed-checksums.sh", "verify-pgp-checksums.sh"):
         shutil.copy2(ROOT / "scripts" / script, work / "scripts" / script)
     shutil.copytree(src, work / f"fedora/{tool}", ignore=shutil.ignore_patterns(old))
     note = work / f"fedora/{tool}/.upstream-archived"
@@ -254,7 +328,7 @@ def setup(tool, w, marker=None):
     git(work, "branch", "-q", "--set-upstream-to=origin/main")
     stubs = w / "bin"
     stubs.mkdir()
-    for n, text in (("curl", CURL), ("gh", GH), ("cosign", COSIGN)):
+    for n, text in (("curl", CURL), ("gh", GH), ("cosign", COSIGN), ("gpg", GPG), ("gpgv", GPGV)):
         (stubs / n).write_text(text)
         (stubs / n).chmod(0o755)
     return work, remote, old
@@ -369,6 +443,21 @@ def cases(tool):
                                    r"SHA256 mismatch", tag=LOCAL, sums="wrong")
         yield lambda t, w: refusal(t, w, "an unchanged release whose signature is gone",
                                    r"Could not download \S+\.sigstore\.json", tag=LOCAL, sig="missing")
+    if tool in PGP:
+        not_signed = rf"checksums\.txt of {re.escape(UPSTREAM[tool][1])} \S+ is not signed by Gitea's release key"
+        no_sig = r"Could not download checksums\.txt\.sig"
+        yield lambda t, w: refusal(t, w, "a checksums.txt changed after it was signed", not_signed, sig="tampered")
+        yield lambda t, w: refusal(t, w, "a release without a signature", no_sig, sig="missing")
+        yield lambda t, w: refusal(t, w, "a signature by another key", not_signed, sig="other-key")
+        yield lambda t, w: refusal(t, w, "a signature by a revoked key", not_signed, sig="revoked")
+        yield lambda t, w: refusal(t, w, "another key served under the release key's fingerprint", not_signed,
+                                   sig="swapped-key")
+        yield lambda t, w: refusal(t, w, "no answer from the key server", r"Could not download Gitea's release key",
+                                   sig="no-key")
+        yield lambda t, w: refusal(t, w, "a vendored binary that no longer matches the signed checksums",
+                                   r"SHA256 mismatch", tag=LOCAL, sums="wrong")
+        yield lambda t, w: refusal(t, w, "an unchanged release whose signature is gone", no_sig, tag=LOCAL,
+                                   sig="missing")
 
 
 def cosign_installed(tool, w):

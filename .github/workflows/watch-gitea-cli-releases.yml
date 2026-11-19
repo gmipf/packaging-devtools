@@ -16,10 +16,13 @@ name: watch-gitea-cli-releases
 # binary at build time (`gt man`, `gt completion`), so they can never drift from
 # the shipped version.
 #
-# Supply chain: gitea-cli publishes a per-asset <asset>.xz.sha256 (matching its
-# signed checksums.txt); we verify the download against that hash before
-# vendoring. Loud-fail (manual review) if the tag isn't vX.Y.Z, the SHA256
-# mismatches, or the payload isn't a valid xz-compressed ELF — never commit a
+# Supply chain: gitea-cli's release lists every asset's SHA256 in checksums.txt
+# and signs that file with Gitea's release key (checksums.txt.sig);
+# scripts/verify-pgp-checksums.sh checks the signature, then the download
+# against it, on every run: before a new release is vendored, and on an
+# unchanged tag against the binary already vendored. Loud-fail (manual
+# review) if the tag isn't vX.Y.Z, the signature or the SHA256 doesn't hold,
+# or the payload isn't a valid xz-compressed ELF — never commit a
 # broken/unverified Source0.
 
 on:
@@ -59,6 +62,9 @@ jobs:
 
           LOCAL_TAG=$(cat "$MARKER" 2>/dev/null || echo none)
           if [ "$UPSTREAM_TAG" = "$LOCAL_TAG" ]; then
+            # Nothing new, but what we ship must still be what Gitea signed.
+            VENDORED=gitea-cli-${LOCAL_TAG#v}-linux-amd64.xz
+            bash scripts/verify-pgp-checksums.sh gitea/cli "$LOCAL_TAG" "$VENDORED" "$DIR/$VENDORED"
             echo "Tag unchanged ($LOCAL_TAG) — no rebuild needed"
             exit 0
           fi
@@ -69,20 +75,12 @@ jobs:
           URL=https://gitea.com/gitea/cli/releases/download/${UPSTREAM_TAG}/gitea-cli-${VERSION}-linux-amd64.xz
 
           # Re-vendor: download to a temp (-f makes curl fail on HTTP errors so a
-          # 404 can't slip an error page through), verify it against upstream's
-          # published per-asset SHA256, then fully decompress it as a second check
-          # and confirm the payload is a Linux ELF before we ever touch the tree.
+          # 404 can't slip an error page through), verify it against the signed
+          # checksums.txt, then fully decompress it as a second check and confirm
+          # the payload is a Linux ELF before we ever touch the tree.
           TMP=$(mktemp); DEC=$(mktemp)
           curl -fsSL "$URL" -o "$TMP"
-          # gitea-cli ships <asset>.xz.sha256 (matching its signed checksums.txt); a
-          # mismatch means a corrupted or tampered download — refuse to vendor.
-          curl -fsSL "${URL}.sha256" -o "$TMP.sha256"
-          EXPECT=$(awk '{print $1}' "$TMP.sha256")
-          ACTUAL=$(sha256sum "$TMP" | awk '{print $1}')
-          if [ -z "$EXPECT" ] || [ "$EXPECT" != "$ACTUAL" ]; then
-            echo "::error::SHA256 mismatch for ${XZ##*/} (want ${EXPECT:-none}, got $ACTUAL) — refusing to vendor"
-            exit 1
-          fi
+          bash scripts/verify-pgp-checksums.sh gitea/cli "$UPSTREAM_TAG" "${XZ##*/}" "$TMP"
           if ! xz -dc "$TMP" > "$DEC" 2>/dev/null; then
             echo "::error::$URL is not a valid xz stream — refusing to vendor"
             exit 1
