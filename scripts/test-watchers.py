@@ -21,6 +21,15 @@ today: archived exactly where the package carries .upstream-archived. An
 archived upstream without that file, the file without an archived upstream,
 and an answer that says neither must each stop the watcher; an archived
 upstream with the file must not.
+
+Anchore signs each release's checksums.txt with cosign
+(scripts/verify-signed-checksums.sh), and the syft, grype and grant watchers
+check that signature on every run: a new release before it is vendored, an
+unchanged one against the tarball already vendored. A cosign stub stands in
+for cosign; its fake bundle names the hash it signs, the signer and the OIDC
+issuer. A checksums.txt changed after signing, a missing signature, another
+signer or another issuer must each stop the watcher, and so must a vendored
+tarball that no longer matches what was signed.
 """
 import hashlib
 import io
@@ -56,6 +65,12 @@ UPSTREAM = {
     "tea": ("gitea", "gitea/tea"),
     "gitea-cli": ("gitea", "gitea/cli"),
 }
+# Who signs each signed upstream's checksums.txt, as read from the certificates
+# in the real bundles (2026-11-19), again independently of the watchers.
+SIGNED = {"syft", "grype", "grant"}
+SIGNER = "https://github.com/{project}/.github/workflows/release.yaml@refs/heads/main"
+ISSUER = "https://token.actions.githubusercontent.com"
+LOCAL = object()  # tag=LOCAL: the release the package already ships
 
 CURL = r"""#!/bin/bash
 url= out=
@@ -81,6 +96,34 @@ while [ $# -gt 0 ]; do case $1 in --repo) repo=$2; shift 2 ;; *) shift ;; esac; 
 f=$STUB_ROOT/gh/$repo
 [ -f "$f" ] || { echo "release not found ($repo)" >&2; exit 1; }
 cat "$f"
+"""
+# cosign verify-blob as far as the watchers use it. The fake bundle is one line:
+# "<sha256 of the signed file> <signer identity> <OIDC issuer>". A flag it does
+# not know is an error, so a watcher that loosens the check is not let through.
+COSIGN = r"""#!/bin/bash
+echo "cosign $*" >> "$STUB_ROOT/calls"
+[ "$1" = verify-blob ] || { echo "cosign stub: only verify-blob" >&2; exit 1; }
+shift
+bundle= id= idre= iss= issre= file=
+while [ $# -gt 0 ]; do
+    case $1 in
+        --bundle) bundle=$2; shift 2 ;;
+        --certificate-identity) id=$2; shift 2 ;;
+        --certificate-identity-regexp) idre=$2; shift 2 ;;
+        --certificate-oidc-issuer) iss=$2; shift 2 ;;
+        --certificate-oidc-issuer-regexp) issre=$2; shift 2 ;;
+        -*) echo "cosign stub: flag $1 not known here" >&2; exit 1 ;;
+        *) file=$1; shift ;;
+    esac
+done
+read -r signed signer issuer < "$bundle" || { echo "Error: cannot read bundle $bundle" >&2; exit 1; }
+[ "$(sha256sum < "$file" | cut -d' ' -f1)" = "$signed" ] ||
+    { echo "Error: failed to verify signature: invalid signature" >&2; exit 1; }
+if [ -n "$id" ]; then [ "$signer" = "$id" ]; elif [ -n "$idre" ]; then [[ $signer =~ $idre ]]; else false; fi ||
+    { echo "Error: failed to verify certificate identity: got SAN \"$signer\"" >&2; exit 1; }
+if [ -n "$iss" ]; then [ "$issuer" = "$iss" ]; elif [ -n "$issre" ]; then [[ $issuer =~ $issre ]]; else false; fi ||
+    { echo "Error: failed to verify certificate identity: got issuer \"$issuer\"" >&2; exit 1; }
+echo "Verified OK" >&2
 """
 
 
@@ -113,11 +156,17 @@ def nevr(spec):
               cwd=spec.parent).splitlines()[0]
 
 
-def fake_release(tool, root, *, tag=TAG, payload=ELF, member=None, sums="good", asset=True, repo=None):
+def fake_release(tool, root, *, tag=TAG, payload=ELF, member=None, sums="good", asset=True, repo=None,
+                 sig="good", vendored=None):
     """Lay out what the upstream would serve. sums: good | wrong | missing.
     repo, the repository's own answer: active | archived | no-field | missing;
-    by default archived exactly where the real package has .upstream-archived."""
+    by default archived exactly where the real package has .upstream-archived.
+    sig, the bundle next to checksums.txt (signed upstreams only): good |
+    tampered (checksums.txt changed after signing) | missing | other-signer |
+    other-issuer. vendored: the bytes the package already ships for this
+    release; checksums.txt lists them instead of the asset."""
     kind, project = UPSTREAM[tool]
+    ver = tag[1:] if re.fullmatch(r"v\d+\.\d+\.\d+", tag) else V
     files = root / "files"
     if repo is None:
         repo = "archived" if (ROOT / f"fedora/{tool}/.upstream-archived").exists() else "active"
@@ -132,7 +181,7 @@ def fake_release(tool, root, *, tag=TAG, payload=ELF, member=None, sums="good", 
     if kind == "github":
         (root / "gh" / project).parent.mkdir(parents=True, exist_ok=True)
         (root / "gh" / project).write_text(tag + "\n")
-        name = f"{tool}_{V}_linux_amd64.tar.gz"
+        name = f"{tool}_{ver}_linux_amd64.tar.gz"
         buf = io.BytesIO()
         with tarfile.open(fileobj=buf, mode="w:gz") as t:
             for n, data in ((member or tool, payload), ("LICENSE", b"license\n")):
@@ -141,22 +190,31 @@ def fake_release(tool, root, *, tag=TAG, payload=ELF, member=None, sums="good", 
                 t.addfile(info, io.BytesIO(data))
         blob = buf.getvalue()
         base = files / f"github.com/{project}/releases/download/{tag}"
-        sumfile, sumline = base / f"{tool}_{V}_checksums.txt", f"  {name}\n"
+        sumfile, sumline = base / f"{tool}_{ver}_checksums.txt", f"  {name}\n"
     else:
         api = files / f"gitea.com/api/v1/repos/{project}/releases"
         api.mkdir(parents=True)
         (api / "latest").write_text(f'{{"tag_name": "{tag}"}}\n')
-        name = f"{tool}-{V}-linux-amd64.xz"
+        name = f"{tool}-{ver}-linux-amd64.xz"
         blob = lzma.compress(payload, format=lzma.FORMAT_XZ)
         base = files / f"gitea.com/{project}/releases/download/{tag}"
         sumfile, sumline = base / f"{name}.sha256", f"  {name}\n"
     base.mkdir(parents=True, exist_ok=True)
     if asset:
         (base / name).write_bytes(blob)
-    digest = hashlib.sha256(blob if sums == "good" else blob + b"tampered").hexdigest()
+    listed = blob if vendored is None else vendored
+    digest = hashlib.sha256(listed if sums == "good" else listed + b"tampered").hexdigest()
     if sums != "missing":
-        other = "0" * 64 + f"  {tool}_{V}_darwin_amd64.tar.gz\n"
+        other = "0" * 64 + f"  {tool}_{ver}_darwin_amd64.tar.gz\n"
         sumfile.write_text((other if kind == "github" else "") + digest + sumline)
+    if tool in SIGNED and sig != "missing":
+        signed = sumfile.read_bytes() if sumfile.exists() else b""
+        signer = SIGNER.format(project=f"someone-else/{tool}" if sig == "other-signer" else project)
+        issuer = "https://accounts.google.com" if sig == "other-issuer" else ISSUER
+        if sig == "tampered":
+            signed += b"0" * 64 + b"  an asset signed before checksums.txt was changed\n"
+        (base / f"{sumfile.name}.sigstore.json").write_text(
+            f"{hashlib.sha256(signed).hexdigest()} {signer} {issuer}\n")
     return name, blob
 
 
@@ -170,7 +228,7 @@ def setup(tool, w, marker=None):
     old = source0(spec)
     work, remote = w / "work", w / "remote.git"
     (work / "scripts").mkdir(parents=True)
-    for script in ("push-retry.sh", "upstream-archived.sh"):
+    for script in ("push-retry.sh", "upstream-archived.sh", "verify-signed-checksums.sh"):
         shutil.copy2(ROOT / "scripts" / script, work / "scripts" / script)
     shutil.copytree(src, work / f"fedora/{tool}", ignore=shutil.ignore_patterns(old))
     note = work / f"fedora/{tool}/.upstream-archived"
@@ -196,7 +254,7 @@ def setup(tool, w, marker=None):
     git(work, "branch", "-q", "--set-upstream-to=origin/main")
     stubs = w / "bin"
     stubs.mkdir()
-    for n, text in (("curl", CURL), ("gh", GH)):
+    for n, text in (("curl", CURL), ("gh", GH), ("cosign", COSIGN)):
         (stubs / n).write_text(text)
         (stubs / n).chmod(0o755)
     return work, remote, old
@@ -253,8 +311,16 @@ def good_release(tool, w):
     }
 
 
+def shipped(tool, work, old):
+    """What fake_release needs to stand for the release the package ships."""
+    return {"tag": (work / f"fedora/{tool}/.upstream-tag").read_text().strip(),
+            "vendored": (work / f"fedora/{tool}" / old).read_bytes()}
+
+
 def refusal(tool, w, label, expect, marker=None, **release):
-    work, remote, _ = setup(tool, w, marker)
+    work, remote, old = setup(tool, w, marker)
+    if release.get("tag") is LOCAL:
+        release.update(shipped(tool, work, old))
     fake_release(tool, w / "up", **release)
     before = refs(remote)
     rc, out = run_watcher(tool, w, work)
@@ -263,8 +329,8 @@ def refusal(tool, w, label, expect, marker=None, **release):
 
 
 def unchanged(tool, w, label="same tag again: nothing to do, nothing pushed", marker=None, repo=None):
-    work, remote, _ = setup(tool, w, marker)
-    fake_release(tool, w / "up", tag=(work / f"fedora/{tool}/.upstream-tag").read_text().strip(), repo=repo)
+    work, remote, old = setup(tool, w, marker)
+    fake_release(tool, w / "up", repo=repo, **shipped(tool, work, old))
     before = refs(remote)
     rc, out = run_watcher(tool, w, work)
     return {label: (rc == 0 and refs(remote) == before, out[-800:])}
@@ -291,6 +357,28 @@ def cases(tool):
     if UPSTREAM[tool][0] == "github":
         yield lambda t, w: refusal(t, w, "an archive without the binary", r"not a valid gzip tarball containing",
                                    member="README")
+    if tool in SIGNED:
+        yield cosign_installed
+        not_signed = r"cosign could not verify \S+_checksums\.txt of anchore/\S+ \S+ as signed by"
+        yield lambda t, w: refusal(t, w, "a checksums.txt changed after it was signed", not_signed, sig="tampered")
+        yield lambda t, w: refusal(t, w, "a release without a signature", r"Could not download \S+\.sigstore\.json",
+                                   sig="missing")
+        yield lambda t, w: refusal(t, w, "a signature by another workflow", not_signed, sig="other-signer")
+        yield lambda t, w: refusal(t, w, "a signature from another OIDC issuer", not_signed, sig="other-issuer")
+        yield lambda t, w: refusal(t, w, "a vendored tarball that no longer matches the signed checksums",
+                                   r"SHA256 mismatch", tag=LOCAL, sums="wrong")
+        yield lambda t, w: refusal(t, w, "an unchanged release whose signature is gone",
+                                   r"Could not download \S+\.sigstore\.json", tag=LOCAL, sig="missing")
+
+
+def cosign_installed(tool, w):
+    steps = yaml.safe_load((ROOT / f".github/workflows/watch-{tool}-releases.yml").read_text())["jobs"]["watch"]["steps"]
+    kinds = [s.get("uses", "run" if "run" in s else "?") for s in steps]
+    cosign = [i for i, k in enumerate(kinds) if k.startswith("sigstore/cosign-installer@")]
+    run = kinds.index("run") if "run" in kinds else -1
+    ok = (len(cosign) == 1 and cosign[0] < run
+          and re.fullmatch(r"sigstore/cosign-installer@[0-9a-f]{40}", kinds[cosign[0]]) is not None)
+    return {"installs cosign, pinned to a commit, before its run step": (ok, str(kinds))}
 
 
 def main():
