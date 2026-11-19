@@ -5,8 +5,8 @@ name: copr-reconcile
 # A COPR build starts when a watcher pushes the package's trigger branch right
 # after pushing the bumped spec + .upstream-tag to main. If that trigger push
 # fails even after push-retry.sh, the version sits on main unbuilt, and every
-# later watcher run finds the marker current and has nothing left to do. Every
-# six hours this compares each spec on main with what COPR has and re-pushes the
+# later watcher run finds the marker current and has nothing left to do. This
+# run compares each spec on main with what COPR has and re-pushes the
 # trigger of any version COPR never got -- only one it never got, so the same
 # NEVRA is never built twice. Anything it must not fix itself (a failed build,
 # COPR ahead of main, a re-push that produced nothing, an API that did not
@@ -14,6 +14,8 @@ name: copr-reconcile
 
 on:
   schedule:
+    # Four slots a day on paper. GitHub drops scheduled runs under load, and
+    # since November 2026 only about two of them a day have run.
     - cron: '41 */6 * * *'
   workflow_dispatch:
   # A change to the reconciler runs its tests and a report, never a heal.

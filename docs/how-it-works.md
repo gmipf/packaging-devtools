@@ -47,11 +47,12 @@ of gitea-cli; the tea package stays at its last release, and
   `.packit.yaml` listens on exactly one `build-<app>` branch, so a push to `main`
   builds nothing and a release of one tool rebuilds no other. All jobs set
   `update_release: false`, so the published NEVRA is exactly the spec's.
-- **Safety net** (`copr-reconcile.yml`, every six hours): if a watcher pushed
-  `main` but its trigger push was lost, the next watcher run sees nothing to do.
-  Every push is therefore retried (`scripts/push-retry.sh`), and the reconciler
-  compares each spec on `main` with COPR: a version COPR never received gets its
-  trigger re-pushed. It never re-pushes a version COPR has seen in any state, so
+- **Safety net** (`copr-reconcile.yml`, scheduled every six hours; GitHub drops
+  scheduled runs under load, and since November 2026 it has run about twice a
+  day): if a watcher pushed `main` but its trigger push was lost, the next
+  watcher run sees nothing to do. Every push is therefore retried
+  (`scripts/push-retry.sh`), and the reconciler compares each spec on `main`
+  with COPR: a version COPR never received gets its trigger re-pushed. It never re-pushes a version COPR has seen in any state, so
   the same NEVRA is never built twice; a failed build, COPR ahead of `main`, or
   an unanswered API turns the run red instead. `scripts/copr-reconcile.py` gives
   the same report locally (`--heal` only in CI).

@@ -171,7 +171,7 @@ fi
 # The offline test suites: the reconciler's decisions, the .packit.yaml rules
 # it relies on (update_release false, no suffix, get-current-version), and
 # every package through a simulated upstream bump. Run here so that a change to
-# .packit.yaml or a spec meets them before it is pushed, not 6 hours later in
+# .packit.yaml or a spec meets them before it is pushed, not hours later in
 # copr-reconcile. They need rpm's Python bindings and PyYAML.
 if have python3; then
     mapfile -t suites < <(git ls-files 'scripts/test-*.py')
